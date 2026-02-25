@@ -1,0 +1,4 @@
+build/
+*.uf2
+*.uf2.gz
+*.uf2.zip
