@@ -4,20 +4,11 @@ include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
 set(BUILD_CONFIG midipico-cortex-m0plus)
+set(PICORUBY_ROOT ${CMAKE_SOURCE_DIR}/lib/picoruby)
 
-add_definitions(
-  -DPICORB_VM_MRUBYC
-  -DDISABLE_MRUBY
-  -DMRBC_NO_STDIO
-  -DMRBC_REQUIRE_32BIT_ALIGNMENT
-  -DMAX_REGS_SIZE=256
-  -DMAX_VM_COUNT=255
-  -DMAX_SYMBOLS_COUNT=1000
-  -DMRBC_CONVERT_CRLF
-  -DMRBC_USE_MATH
-  -DMRBC_USE_FLOAT=2
-  -DNO_CLOCK_GETTIME=1
-  -DPICORUBY_NO_MSC
+add_compile_definitions(
+  PICORB_VM_MRUBYC=1
+  PICORUBY_NO_MSC=1
 )
 
 project(midipico C CXX ASM)
@@ -32,29 +23,33 @@ add_compile_options(-Wall
 )
 
 file(GLOB SRCS src/*.c)
+file(GLOB PORT_FILES CONFIGURE_DEPENDS
+  ${PICORUBY_ROOT}/mrbgems/picoruby-gpio/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-machine/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-machine/ports/common/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-io-console/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-env/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/ports/rp2040/*.c
+)
+# msc_disk.c requires PICORUBY_MSC_FLASH or PICORUBY_MSC_SD; excluded via PICORUBY_NO_MSC
+list(FILTER PORT_FILES EXCLUDE REGEX "msc_disk\\.c$")
+
 add_executable(${PROJECT_NAME}
   ${SRCS}
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-gpio/ports/rp2040/gpio.c
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-machine/ports/rp2040/machine.c
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-machine/ports/common/machine.c
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-io-console/ports/rp2040/io-console.c
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-env/ports/rp2040/env.c
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-filesystem-fat/ports/rp2040/flash_disk.c
+  ${PORT_FILES}
 )
 
-set(PICORBC ${CMAKE_SOURCE_DIR}/lib/picoruby/bin/picorbc)
+set(PICORBC ${PICORUBY_ROOT}/bin/picorbc)
 
 add_custom_target(mrbdir ALL
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/build/mrb
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/mrb
 )
 
-set(RUBY_TASK_FILES
-  main_task
-)
+set(RUBY_TASK_FILES main_task)
 foreach(rb ${RUBY_TASK_FILES})
   add_custom_target(${rb}
     COMMAND ${PICORBC} -B${rb}
-      -o${CMAKE_SOURCE_DIR}/build/mrb/${rb}.c
+      -o${CMAKE_BINARY_DIR}/mrb/${rb}.c
       ${CMAKE_SOURCE_DIR}/mrblib/${rb}.rb
   )
 endforeach(rb)
@@ -66,22 +61,27 @@ add_dependencies(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/tinyusb
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-machine/include
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-mrubyc/lib/mrubyc/src
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems/picoruby-filesystem-fat/lib/ff14b/source
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/mrbgems
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/build/${BUILD_CONFIG}/mrbgems
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/build/repos/${BUILD_CONFIG}/mruby-compiler2/include
-  ${CMAKE_SOURCE_DIR}/build/mrb
+  ${CMAKE_BINARY_DIR}/mrb
+  ${PICORUBY_ROOT}/include
+  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/include
+  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/mrbgems
+  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/include
+  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/lib/prism/include
+  ${PICORUBY_ROOT}/mrbgems/picoruby-mrubyc/lib/mrubyc/src
+  ${PICORUBY_ROOT}/mrbgems/picoruby-machine/include
+  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/lib/ff14b/source
 )
 
 target_link_directories(${PROJECT_NAME} PRIVATE
-  ${CMAKE_SOURCE_DIR}/lib/picoruby/build/${BUILD_CONFIG}/lib
+  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/lib
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
   pico_stdlib
   pico_unique_id
+  pico_aon_timer
+  tinyusb_device
+  tinyusb_board
   hardware_gpio
   hardware_rosc
   hardware_rtc
@@ -97,9 +97,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   hardware_spi
   hardware_pwm
   hardware_sleep
-  pico_aon_timer
-  tinyusb_device
-  tinyusb_board
   mruby
 )
 
