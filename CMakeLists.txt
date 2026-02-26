@@ -6,7 +6,7 @@
 # ビルドの流れ:
 #   1. mrblib/*.rb を picorbc でバイトコード配列 (C ソース) に変換
 #   2. src/*.c とPicoRuby gem のポートファイル (RP2040 向け HAL 実装) をコンパイル
-#   3. 上記 + libmruby.a + pico-sdk をリンクして .uf2 を生成
+#   3. 上記 + libmruby.a + pico-sdk + Pico-PIO-USB をリンクして .uf2 を生成
 
 cmake_minimum_required(VERSION 3.24)
 
@@ -18,18 +18,25 @@ include(pico_extras_import.cmake)
 # build_config/ 下の .rb ファイル名と対応。libmruby のビルド出力パスに使う。
 set(BUILD_CONFIG midipico-cortex-m0plus)
 set(PICORUBY_ROOT ${CMAKE_SOURCE_DIR}/lib/picoruby)
+set(PICO_PIO_USB_ROOT ${CMAKE_SOURCE_DIR}/lib/Pico-PIO-USB)
+set(PICO_TINYUSB_PATH ${PICORUBY_ROOT}/mrbgems/picoruby-r2p2/lib/pico-sdk/lib/tinyusb)
 
 # PICORB_VM_MRUBYC: picoruby.h が mruby/c VM 用のヘッダ・API を選択するために必要。
 #                    未定義だと mruby VM 側が選ばれてしまう。
 # PICORUBY_NO_MSC:   USB Mass Storage Class を無効化。msc_disk.c 全体をスキップする。
+# PIO_USB_USE_TINYUSB: Pico-PIO-USB を TinyUSB 経由で使う (独自 API ではなく TinyUSB の Host API を利用)。
 add_compile_definitions(
   PICORB_VM_MRUBYC=1
   PICORUBY_NO_MSC=1
+  PIO_USB_USE_TINYUSB=1
 )
 
 project(midipico C CXX ASM)
 
 pico_sdk_init()
+
+# Pico-PIO-USB ライブラリ。pico_pio_usb INTERFACE ターゲットが使えるようになる。
+add_subdirectory(${PICO_PIO_USB_ROOT} pico_pio_usb)
 
 add_compile_options(-Wall
   -Wno-format
@@ -60,6 +67,9 @@ list(FILTER PORT_FILES EXCLUDE REGEX "msc_disk\\.c$")
 add_executable(${PROJECT_NAME}
   ${SRCS}
   ${PORT_FILES}
+  # TinyUSB の PIO USB Host/Device コントローラドライバ
+  ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c
+  ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c
 )
 
 # --- Ruby → C バイトコード変換 ---
@@ -112,10 +122,13 @@ target_link_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
   pico_stdlib
   pico_unique_id
+  pico_multicore
   pico_aon_timer
+  pico_pio_usb        # Pico-PIO-USB (PIO ステートマシンによる USB ホスト実装)
   tinyusb_device
-  tinyusb_board
+  tinyusb_host         # USB Host スタック (列挙、コールバック管理)
   hardware_gpio
+  hardware_pio
   hardware_rosc
   hardware_rtc
   hardware_vreg
