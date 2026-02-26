@@ -59,22 +59,33 @@ mrbgems/picoruby-pio-usb-midi/
 - Raspberry Pi Pico (RP2040)
 - USB-A コネクタ（PIO USB Host ポート用）
 - 22Ω 抵抗 × 2（D+/D- ライン用）
-- 1.5kΩ 抵抗 × 1（D+ プルアップ用）
 
 ### 配線
 
-PIO USB Host ポートとして GPIO 2本を使用する。D+ と D- は隣接する GPIO ピンである必要がある。
+PIO USB Host ポートとして GPIO 2本を使用する。D+ と D- は隣接する GPIO ピンである必要がある（Pico-PIO-USB の要件）。
 
-| 信号 | GPIO | 備考 |
-|------|------|------|
-| D+   | GP0  | 22Ω 直列抵抗経由で USB-A コネクタへ。1.5kΩ で 3.3V にプルアップ |
-| D-   | GP1  | 22Ω 直列抵抗経由で USB-A コネクタへ |
-| VBUS | VBUS | USB-A コネクタの VBUS に接続（5V 給電） |
-| GND  | GND  | USB-A コネクタの GND に接続 |
+```
+                    22Ω
+Pico GP0 (pin 1) ──┤├── USB-A D+
+                    22Ω
+Pico GP1 (pin 2) ──┤├── USB-A D-
+
+Pico VBUS (pin 40) ────── USB-A VBUS (5V)
+Pico GND  (pin 38) ────── USB-A GND
+```
+
+| Pico 側 | ピン番号 | USB-A 側 | 備考 |
+|----------|----------|----------|------|
+| GP0      | 1        | D+       | 22Ω 直列抵抗経由 |
+| GP1      | 2        | D-       | 22Ω 直列抵抗経由 |
+| VBUS     | 40       | VBUS     | USB バスパワー給電 (5V) |
+| GND      | 38       | GND      | |
+
+D+ に外部プルアップ抵抗は不要。USB Host は D+/D- にプルダウンを持ち、デバイス側が接続時に D+ をプルアップすることで検出する。外部プルアップを付けると D+ が常に HIGH になり、ホットプラグ検出が機能しなくなる。
 
 ### 制約
 
-- システムクロックを 120MHz に設定する必要がある（PIO USB の要件）
+- システムクロックを 120MHz に設定する必要がある（PIO USB は 12MHz の倍数を要求する。デフォルト 125MHz では USB bit timing が合わない）
 
 ## 依存ライブラリ
 
