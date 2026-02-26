@@ -10,6 +10,7 @@
 #include "hardware/gpio.h"
 
 #include "usb_host.h"
+#include "midi_host.h"
 
 #define LED_PIN 25
 
@@ -60,6 +61,8 @@ void tuh_mount_cb(uint8_t daddr)
   uint16_t vid, pid;
   tuh_vid_pid_get(daddr, &vid, &pid);
   printf("[USB Host] Device mounted: addr=%u, VID=%04x, PID=%04x\n", daddr, vid, pid);
+
+  midi_host_mount(daddr);
 }
 
 /*
@@ -68,6 +71,8 @@ void tuh_mount_cb(uint8_t daddr)
 void tuh_umount_cb(uint8_t daddr)
 {
   blink_led(1);
+
+  midi_host_umount(daddr);
 
   printf("[USB Host] Device unmounted: addr=%u\n", daddr);
 }
