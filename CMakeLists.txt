@@ -1,11 +1,27 @@
+# ファームウェアビルド設定
+#
+# このファイルは Stage 2 (cmake) と Stage 3 (build) を担当する。
+# Stage 1 (libmruby) で生成済みの libmruby.a を前提としている。
+#
+# ビルドの流れ:
+#   1. mrblib/*.rb を picorbc でバイトコード配列 (C ソース) に変換
+#   2. src/*.c とPicoRuby gem のポートファイル (RP2040 向け HAL 実装) をコンパイル
+#   3. 上記 + libmruby.a + pico-sdk をリンクして .uf2 を生成
+
 cmake_minimum_required(VERSION 3.24)
 
+# pico-sdk / pico-extras のブートストラップ。
+# 環境変数 PICO_SDK_PATH, PICO_EXTRAS_PATH で渡されたパスを使って SDK を初期化する。
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
+# build_config/ 下の .rb ファイル名と対応。libmruby のビルド出力パスに使う。
 set(BUILD_CONFIG midipico-cortex-m0plus)
 set(PICORUBY_ROOT ${CMAKE_SOURCE_DIR}/lib/picoruby)
 
+# PICORB_VM_MRUBYC: picoruby.h が mruby/c VM 用のヘッダ・API を選択するために必要。
+#                    未定義だと mruby VM 側が選ばれてしまう。
+# PICORUBY_NO_MSC:   USB Mass Storage Class を無効化。msc_disk.c 全体をスキップする。
 add_compile_definitions(
   PICORB_VM_MRUBYC=1
   PICORUBY_NO_MSC=1
@@ -22,7 +38,13 @@ add_compile_options(-Wall
   -fshort-enums
 )
 
+# --- ソースファイル収集 ---
+
 file(GLOB SRCS src/*.c)
+
+# PicoRuby gem のポートファイル: 各 gem の RP2040 向け HAL 実装 (GPIO操作、USB CDC 等)。
+# build_config で有効にした gem に対応するものだけを列挙する。
+# CONFIGURE_DEPENDS を指定すると、ファイル追加時に CMake が自動で再構成する。
 file(GLOB PORT_FILES CONFIGURE_DEPENDS
   ${PICORUBY_ROOT}/mrbgems/picoruby-gpio/ports/rp2040/*.c
   ${PICORUBY_ROOT}/mrbgems/picoruby-machine/ports/rp2040/*.c
@@ -31,13 +53,19 @@ file(GLOB PORT_FILES CONFIGURE_DEPENDS
   ${PICORUBY_ROOT}/mrbgems/picoruby-env/ports/rp2040/*.c
   ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/ports/rp2040/*.c
 )
-# msc_disk.c requires PICORUBY_MSC_FLASH or PICORUBY_MSC_SD; excluded via PICORUBY_NO_MSC
+# msc_disk.c は PICORUBY_MSC_FLASH か PICORUBY_MSC_SD が必要。
+# このプロジェクトでは MSC 不要なので除外する (PICORUBY_NO_MSC で中身も空になる)。
 list(FILTER PORT_FILES EXCLUDE REGEX "msc_disk\\.c$")
 
 add_executable(${PROJECT_NAME}
   ${SRCS}
   ${PORT_FILES}
 )
+
+# --- Ruby → C バイトコード変換 ---
+# picorbc は PicoRuby のバイトコードコンパイラ。
+# .rb ファイルを「const uint8_t main_task[] = {...};」のような C 配列に変換する。
+# 生成された .c は main.c から #include "main_task.c" で取り込まれる。
 
 set(PICORBC ${PICORUBY_ROOT}/bin/picorbc)
 
@@ -59,23 +87,28 @@ add_dependencies(${PROJECT_NAME}
   ${RUBY_TASK_FILES}
 )
 
+# --- インクルードパス ---
 target_include_directories(${PROJECT_NAME} PRIVATE
-  ${CMAKE_SOURCE_DIR}/tinyusb
-  ${CMAKE_BINARY_DIR}/mrb
-  ${PICORUBY_ROOT}/include
-  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/include
-  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/mrbgems
-  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/include
-  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/lib/prism/include
-  ${PICORUBY_ROOT}/mrbgems/picoruby-mrubyc/lib/mrubyc/src
-  ${PICORUBY_ROOT}/mrbgems/picoruby-machine/include
-  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/lib/ff14b/source
+  ${CMAKE_SOURCE_DIR}/tinyusb                                       # tusb_config.h (USB デバイス設定)
+  ${CMAKE_BINARY_DIR}/mrb                                           # picorbc が生成した .c ファイル
+  ${PICORUBY_ROOT}/include                                          # picoruby.h (VM 抽象化層)
+  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/include                    # libmruby ビルドが生成したヘッダ
+  ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/mrbgems                    # picogem_init.c (gem 登録テーブル)
+  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/include                 # mrc_common.h 等 (picoruby.h が参照)
+  ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/lib/prism/include       # Prism パーサ (コンパイラ依存)
+  ${PICORUBY_ROOT}/mrbgems/picoruby-mrubyc/lib/mrubyc/src          # mruby/c VM のヘッダ
+  ${PICORUBY_ROOT}/mrbgems/picoruby-machine/include                # hal.h (HAL 抽象層)
+  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/lib/ff14b/source # FatFs ライブラリ
 )
 
+# Stage 1 で生成した libmruby.a の場所
 target_link_directories(${PROJECT_NAME} PRIVATE
   ${PICORUBY_ROOT}/build/${BUILD_CONFIG}/lib
 )
 
+# --- リンクライブラリ ---
+# picoruby-machine のポートファイルが多くの pico-sdk ハードウェアモジュールに依存するため、
+# 実際に GPIO と USB CDC しか使っていなくても、これだけのライブラリが必要になる。
 target_link_libraries(${PROJECT_NAME} PRIVATE
   pico_stdlib
   pico_unique_id
@@ -97,7 +130,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   hardware_spi
   hardware_pwm
   hardware_sleep
-  mruby
+  mruby              # libmruby.a (mruby/c VM + 全 gem)
 )
 
+# .elf から .uf2 等の追加出力を生成する pico-sdk のヘルパー
 pico_add_extra_outputs(${PROJECT_NAME})
