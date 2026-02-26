@@ -148,3 +148,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # .elf から .uf2 等の追加出力を生成する pico-sdk のヘルパー
 pico_add_extra_outputs(${PROJECT_NAME})
+
+# pico_stdio_usb 無効化: 内部で tusb_init() が Host スタックも初期化し、
+# Core1 の PIO USB Host と競合するため。代わりに src/cdc_stdio.c で
+# Device スタックのみ初期化するカスタムドライバを使う。
+# pico_stdio_uart 無効化: デフォルトの UART0 (GP0/GP1) が PIO USB の
+# D+/D- と同じピンで衝突するため。
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
