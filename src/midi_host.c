@@ -29,6 +29,7 @@ static uint8_t config_buf[256];
 /* Active MIDI device */
 static uint8_t midi_daddr;
 static uint8_t midi_ep_in;
+static uint8_t midi_itf_num;
 
 /* Ring buffer */
 static midi_event_t event_buf[MIDI_EVENT_BUF_SIZE];
@@ -36,6 +37,7 @@ static volatile uint8_t ev_head;  /* Core1 writes */
 static volatile uint8_t ev_tail;  /* Core0 writes */
 
 static void parse_config_descriptor(tuh_xfer_t *xfer);
+static void set_interface_cb(tuh_xfer_t *xfer);
 static void midi_rx_cb(tuh_xfer_t *xfer);
 
 void midi_host_mount(uint8_t daddr)
@@ -51,25 +53,21 @@ void midi_host_umount(uint8_t daddr)
   if (midi_daddr == daddr) {
     midi_daddr = 0;
     midi_ep_in = 0;
+    midi_itf_num = 0;
   }
 }
 
 /*
  * Configuration descriptor を走査して MIDIStreaming インターフェースの
- * Bulk IN エンドポイントを探す。見つかったらエンドポイントを開いて受信開始。
+ * Bulk IN エンドポイントを探す。
  *
- * USB MIDI デバイスの典型的なディスクリプタ構成:
- *   Interface: class=Audio(0x01), subclass=MIDIStreaming(0x03)
- *   ├── Class-specific descriptors (Jack, Element)
- *   ├── Endpoint: Bulk OUT (host→device, MIDI 送信)
- *   └── Endpoint: Bulk IN  (device→host, MIDI 受信) ← これを探す
+ * エンドポイントが見つかったら SET_INTERFACE を送信してインターフェースを
+ * アクティベートする。USB Audio クラスではホストが SET_INTERFACE を発行する
+ * までデバイスがデータを送らない場合がある。
  */
 static void parse_config_descriptor(tuh_xfer_t *xfer)
 {
-  if (xfer->result != XFER_RESULT_SUCCESS) {
-    printf("[MIDI] Config descriptor request failed\n");
-    return;
-  }
+  if (xfer->result != XFER_RESULT_SUCCESS) return;
 
   tusb_desc_configuration_t const *cfg =
       (tusb_desc_configuration_t const *)config_buf;
@@ -90,6 +88,9 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
       tusb_desc_interface_t const *itf = (tusb_desc_interface_t const *)p;
       in_midi = (itf->bInterfaceClass == TUSB_CLASS_AUDIO &&
                  itf->bInterfaceSubClass == AUDIO_SUBCLASS_MIDI_STREAMING);
+      if (in_midi) {
+        midi_itf_num = itf->bInterfaceNumber;
+      }
     }
 
     if (in_midi &&
@@ -101,20 +102,16 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
         midi_ep_in = ep->bEndpointAddress;
 
         if (!tuh_edpt_open(xfer->daddr, ep)) {
-          printf("[MIDI] Failed to open endpoint 0x%02x\n", midi_ep_in);
           midi_ep_in = 0;
           return;
         }
-        printf("[MIDI] Endpoint 0x%02x opened, receiving\n", midi_ep_in);
 
-        tuh_xfer_t rx = {
-          .daddr       = xfer->daddr,
-          .ep_addr     = midi_ep_in,
-          .buffer      = rx_buf,
-          .buflen      = sizeof(rx_buf),
-          .complete_cb = midi_rx_cb,
-        };
-        tuh_edpt_xfer(&rx);
+        /*
+         * SET_INTERFACE を送ってインターフェースをアクティベートする。
+         * これがないとデバイスが空データを返し続ける場合がある。
+         */
+        tuh_interface_set(xfer->daddr, midi_itf_num, 0,
+                          set_interface_cb, 0);
         return;
       }
     }
@@ -122,7 +119,23 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
     p += len;
   }
 
-  printf("[MIDI] No MIDI IN endpoint found\n");
+}
+
+/*
+ * SET_INTERFACE 完了後に受信を開始する。
+ */
+static void set_interface_cb(tuh_xfer_t *xfer)
+{
+  if (xfer->result != XFER_RESULT_SUCCESS) return;
+
+  tuh_xfer_t rx = {
+    .daddr       = midi_daddr,
+    .ep_addr     = midi_ep_in,
+    .buffer      = rx_buf,
+    .buflen      = sizeof(rx_buf),
+    .complete_cb = midi_rx_cb,
+  };
+  tuh_edpt_xfer(&rx);
 }
 
 static void push_event(uint8_t status, uint8_t data1, uint8_t data2)
@@ -149,7 +162,7 @@ static void push_event(uint8_t status, uint8_t data1, uint8_t data2)
  */
 static void midi_rx_cb(tuh_xfer_t *xfer)
 {
-  if (xfer->result == XFER_RESULT_SUCCESS) {
+  if (xfer->result == XFER_RESULT_SUCCESS && xfer->actual_len > 0) {
     for (uint32_t i = 0;
          i + USB_MIDI_PACKET_SIZE <= xfer->actual_len;
          i += USB_MIDI_PACKET_SIZE)
@@ -176,9 +189,20 @@ static void midi_rx_cb(tuh_xfer_t *xfer)
     }
   }
 
-  /* Continue receiving while device is connected */
+  /*
+   * tuh_xfer_t の buffer/buflen はコールバック内では利用不可
+   * (TinyUSB が非コントロール転送では保持しない) なので、
+   * xfer を再利用せず新規に構築する。
+   */
   if (midi_daddr) {
-    tuh_edpt_xfer(xfer);
+    tuh_xfer_t rx = {
+      .daddr       = midi_daddr,
+      .ep_addr     = midi_ep_in,
+      .buffer      = rx_buf,
+      .buflen      = sizeof(rx_buf),
+      .complete_cb = midi_rx_cb,
+    };
+    tuh_edpt_xfer(&rx);
   }
 }
 
