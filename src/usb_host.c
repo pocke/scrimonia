@@ -13,14 +13,14 @@
 
 #define LED_PIN 25
 
-/* デバッグ用: LED を n 回素早く点滅させる */
+/* デバッグ用: LED を n 回短く点滅させる */
 static void blink_led(int n)
 {
   for (int i = 0; i < n; i++) {
     gpio_put(LED_PIN, 1);
-    sleep_ms(200);
+    sleep_ms(50);
     gpio_put(LED_PIN, 0);
-    sleep_ms(200);
+    sleep_ms(50);
   }
 }
 
@@ -33,24 +33,16 @@ void core1_main(void)
 {
   sleep_ms(10);
 
-  /*
-   * LED を Core1 からも制御してデバッグに使う。
-   * Core0 の Ruby タスクも LED を使うが、デバッグ中は
-   * この点滅パターンで Core1 動作を確認できる。
-   */
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
-
-  /* Core1 起動確認: 2回点滅 */
-  blink_led(2);
 
   /* GP0 = D+, GP1 = D- (PIO_USB_DEFAULT_CONFIG の pin_dp デフォルトは 0) */
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   tuh_configure(1, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
   tuh_init(1);
 
-  /* tuh_init 成功確認: 3回点滅 */
-  blink_led(3);
+  /* Core1 + PIO USB Host 初期化完了: 1回点滅 */
+  blink_led(1);
 
   while (true) {
     tuh_task();
@@ -63,8 +55,7 @@ void core1_main(void)
  */
 void tuh_mount_cb(uint8_t daddr)
 {
-  /* mount 確認: 5回高速点滅 */
-  blink_led(7);
+  blink_led(2);
 
   uint16_t vid, pid;
   tuh_vid_pid_get(daddr, &vid, &pid);
@@ -76,10 +67,7 @@ void tuh_mount_cb(uint8_t daddr)
  */
 void tuh_umount_cb(uint8_t daddr)
 {
-  /* unmount 確認: 1回長い点灯 */
-  gpio_put(LED_PIN, 1);
-  sleep_ms(500);
-  gpio_put(LED_PIN, 0);
+  blink_led(1);
 
   printf("[USB Host] Device unmounted: addr=%u\n", daddr);
 }
