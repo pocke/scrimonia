@@ -7,5 +7,13 @@ class MidiPico
         @keycode = keycode
       end
     end
+
+    class Modifier
+      attr_reader :modifier
+
+      def initialize(modifier)
+        @modifier = modifier
+      end
+    end
   end
 end

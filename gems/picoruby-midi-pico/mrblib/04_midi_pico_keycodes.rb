@@ -78,5 +78,15 @@ class MidiPico
     KC_END   = Action::Keycode.new(0x4D)
     KC_PGUP  = Action::Keycode.new(0x4B)
     KC_PGDN  = Action::Keycode.new(0x4E)
+
+    # Modifier keys (HID modifier bitmask)
+    KC_LCTL  = Action::Modifier.new(0x01)
+    KC_LSFT  = Action::Modifier.new(0x02)
+    KC_LALT  = Action::Modifier.new(0x04)
+    KC_LGUI  = Action::Modifier.new(0x08)
+    KC_RCTL  = Action::Modifier.new(0x10)
+    KC_RSFT  = Action::Modifier.new(0x20)
+    KC_RALT  = Action::Modifier.new(0x40)
+    KC_RGUI  = Action::Modifier.new(0x80)
   end
 end

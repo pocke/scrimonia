@@ -32,6 +32,11 @@ class MidiPico
     layer = @layers[:default]
     raise "No :default layer defined" unless layer
 
+    # NOTE_OFF 時にベロシティ条件なしで正しいアクションを逆引きするため、
+    # 押下中のノートとそのアクションを記録する
+    pressed = {}
+    modifier_state = 0
+
     loop do
       ev = PioUsbMidi.receive
       if ev
@@ -39,12 +44,25 @@ class MidiPico
         if status == PioUsbMidi::NOTE_ON && velocity > 0
           puts "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}"
           action = find_action(layer[note], velocity)
-          if action.is_a?(Action::Keycode)
-            HidKeyboard.press(action.keycode)
+          pressed[note] = action
+          if action.is_a?(Action::Modifier)
+            modifier_state = modifier_state | action.modifier
+            HidKeyboard.press(0, modifier_state)
+          elsif action.is_a?(Action::Keycode)
+            HidKeyboard.press(action.keycode, modifier_state)
           end
         elsif status == PioUsbMidi::NOTE_OFF || (status == PioUsbMidi::NOTE_ON && velocity == 0)
           puts "NOTE_OFF #{Note.name_for(note)}"
-          HidKeyboard.release_all
+          action = pressed.delete(note)
+          if action.is_a?(Action::Modifier)
+            modifier_state = modifier_state & ~action.modifier
+          end
+          # 修飾キーが残っていればそれだけ維持、なければ全解除
+          if modifier_state > 0
+            HidKeyboard.press(0, modifier_state)
+          else
+            HidKeyboard.release_all
+          end
         end
       end
       Machine.delay_ms 1
