@@ -1,8 +1,12 @@
-#ifndef MIDI_HOST_H_
-#define MIDI_HOST_H_
+#ifndef PIO_USB_MIDI_DEFINED_H_
+#define PIO_USB_MIDI_DEFINED_H_
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
   uint8_t status;   /* 0x90 = Note On, 0x80 = Note Off */
@@ -17,16 +21,20 @@ typedef struct {
  * Requests the configuration descriptor and searches for
  * a MIDIStreaming Bulk IN endpoint to start receiving MIDI data.
  */
-void midi_host_mount(uint8_t daddr);
+void pio_usb_midi_mount(uint8_t daddr);
 
 /* Called from tuh_umount_cb to stop reception and reset state. */
-void midi_host_umount(uint8_t daddr);
+void pio_usb_midi_umount(uint8_t daddr);
 
 /*
  * Pop the next MIDI event from the ring buffer.
  * Thread-safe for single-producer (Core1) / single-consumer (Core0).
  * Returns false if the buffer is empty.
  */
-bool midi_host_read_event(midi_event_t *event);
+bool pio_usb_midi_read_event(midi_event_t *event);
 
-#endif /* MIDI_HOST_H_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* PIO_USB_MIDI_DEFINED_H_ */

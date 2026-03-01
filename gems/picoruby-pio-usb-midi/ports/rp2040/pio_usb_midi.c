@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include "tusb.h"
 
-#include "midi_host.h"
+#include "pio_usb_midi.h"
 
 /* USB Audio class, MIDIStreaming subclass */
 #define AUDIO_SUBCLASS_MIDI_STREAMING 0x03
@@ -40,7 +40,7 @@ static void parse_config_descriptor(tuh_xfer_t *xfer);
 static void set_interface_cb(tuh_xfer_t *xfer);
 static void midi_rx_cb(tuh_xfer_t *xfer);
 
-void midi_host_mount(uint8_t daddr)
+void pio_usb_midi_mount(uint8_t daddr)
 {
   midi_daddr = daddr;
   tuh_descriptor_get_configuration(daddr, 0,
@@ -48,7 +48,7 @@ void midi_host_mount(uint8_t daddr)
       parse_config_descriptor, 0);
 }
 
-void midi_host_umount(uint8_t daddr)
+void pio_usb_midi_umount(uint8_t daddr)
 {
   if (midi_daddr == daddr) {
     midi_daddr = 0;
@@ -118,7 +118,6 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
 
     p += len;
   }
-
 }
 
 /*
@@ -182,9 +181,6 @@ static void midi_rx_cb(tuh_xfer_t *xfer)
 
       if (msg == 0x90 || msg == 0x80) {
         push_event(msg, data1, data2);
-        printf("[MIDI] %s note=%u vel=%u ch=%u\n",
-               msg == 0x90 ? "NoteOn " : "NoteOff",
-               data1, data2, (status & 0x0F) + 1);
       }
     }
   }
@@ -206,7 +202,7 @@ static void midi_rx_cb(tuh_xfer_t *xfer)
   }
 }
 
-bool midi_host_read_event(midi_event_t *event)
+bool pio_usb_midi_read_event(midi_event_t *event)
 {
   if (ev_head == ev_tail) return false;
 

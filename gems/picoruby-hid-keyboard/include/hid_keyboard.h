@@ -1,8 +1,12 @@
-#ifndef HID_KEYBOARD_H_
-#define HID_KEYBOARD_H_
+#ifndef HID_KEYBOARD_DEFINED_H_
+#define HID_KEYBOARD_DEFINED_H_
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Send a keyboard report via USB HID.
@@ -17,4 +21,8 @@ bool hid_keyboard_send(uint8_t modifier, const uint8_t *keycodes, uint8_t count)
 /* Release all keys (send an empty report). */
 bool hid_keyboard_release_all(void);
 
-#endif /* HID_KEYBOARD_H_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HID_KEYBOARD_DEFINED_H_ */
