@@ -37,11 +37,13 @@ class MidiPico
       if ev
         status, note, velocity = ev
         if status == PioUsbMidi::NOTE_ON && velocity > 0
+          puts "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}"
           action = find_action(layer[note], velocity)
           if action.is_a?(Action::Keycode)
             HidKeyboard.press(action.keycode)
           end
         elsif status == PioUsbMidi::NOTE_OFF || (status == PioUsbMidi::NOTE_ON && velocity == 0)
+          puts "NOTE_OFF #{Note.name_for(note)}"
           HidKeyboard.release_all
         end
       end
