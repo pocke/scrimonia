@@ -21,7 +21,4 @@ mrbc_pio_usb_midi_init(mrbc_vm *vm)
 {
   mrbc_class *cls = mrbc_define_class(vm, "PioUsbMidi", mrbc_class_object);
   mrbc_define_method(vm, cls, "receive", c_receive);
-
-  mrbc_set_class_const(cls, mrbc_str_to_symid("NOTE_ON"),  &mrbc_integer_value(0x90));
-  mrbc_set_class_const(cls, mrbc_str_to_symid("NOTE_OFF"), &mrbc_integer_value(0x80));
 }
