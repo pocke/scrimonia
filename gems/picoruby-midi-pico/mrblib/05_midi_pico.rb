@@ -42,7 +42,7 @@ class MidiPico
       if ev
         status, note, velocity = ev
         if status == PioUsbMidi::NOTE_ON && velocity > 0
-          puts "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}"
+          print "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}\r\n"
           action = find_action(layer[note], velocity)
           pressed[note] = action
           if action.is_a?(Action::Modifier)
@@ -52,7 +52,7 @@ class MidiPico
             HidKeyboard.press(action.keycode, modifier_state)
           end
         elsif status == PioUsbMidi::NOTE_OFF || (status == PioUsbMidi::NOTE_ON && velocity == 0)
-          puts "NOTE_OFF #{Note.name_for(note)}"
+          print "NOTE_OFF #{Note.name_for(note)}\r\n"
           action = pressed.delete(note)
           if action.is_a?(Action::Modifier)
             modifier_state = modifier_state & ~action.modifier
