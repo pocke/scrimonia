@@ -1,3 +1,4 @@
+require 'machine'
 require 'pio_usb_midi'
 require 'hid_keyboard'
 
