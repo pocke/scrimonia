@@ -8,6 +8,8 @@
 
 #include "usb_host.h"
 #include "cdc_stdio.h"
+#include "midi_host.h"
+#include "hid_keyboard.h"
 #include "main_task.c"
 
 #define HEAP_SIZE (1024 * 194)
@@ -41,18 +43,29 @@ main(void)
   }
   printf("[Core0] midipico booted (clock=%luHz)\n", clock_get_hz(clk_sys));
 
-  /* mruby/c VM */
-  mrbc_init(heap_pool, HEAP_SIZE);
-  mrbc_tcb *tcb = mrbc_create_task(main_task, 0);
-  if (!tcb) {
-    const char *msg = "mrbc_create_task failed\n";
-    hal_write(1, msg, strlen(msg));
-    return 1;
-  }
-  mrbc_set_task_name(tcb, "main_task");
-  picoruby_init_require(&tcb->vm);
+  /*
+   * MIDI → HID テストループ。
+   * Note On を受信したら対応するキーを press、Note Off で release。
+   * 動作確認後は Ruby VM 側に移行する。
+   */
+  printf("[Core0] Entering MIDI->HID loop\n");
+  while (true) {
+    tud_task();
 
-  mrbc_run();
+    midi_event_t ev;
+    while (midi_host_read_event(&ev)) {
+      if (ev.status == 0x90) {
+        uint8_t keycode = HID_KEY_A;
+        hid_keyboard_send(0, &keycode, 1);
+        printf("[HID] key press (note=%u)\n", ev.note);
+      } else if (ev.status == 0x80) {
+        hid_keyboard_release_all();
+        printf("[HID] key release (note=%u)\n", ev.note);
+      }
+    }
+
+    sleep_ms(1);
+  }
 
   return 0;
 }
