@@ -1,8 +1,6 @@
 #include <mrubyc.h>
 
-/*
- * HidKeyboard.press(keycode, modifier = 0)
- */
+/* HidKeyboard.press(keycode, modifier = 0) */
 static void
 c_press(mrbc_vm *vm, mrbc_value *v, int argc)
 {
@@ -12,9 +10,7 @@ c_press(mrbc_vm *vm, mrbc_value *v, int argc)
   SET_BOOL_RETURN(ok);
 }
 
-/*
- * HidKeyboard.release_all
- */
+/* HidKeyboard.release_all */
 static void
 c_release_all(mrbc_vm *vm, mrbc_value *v, int argc)
 {

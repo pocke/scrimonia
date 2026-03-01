@@ -1,8 +1,6 @@
 #include <mrubyc.h>
 
-/*
- * PioUsbMidi.receive -> [status, note, velocity] or nil
- */
+/* PioUsbMidi.receive -> [status, note, velocity] or nil */
 static void
 c_receive(mrbc_vm *vm, mrbc_value *v, int argc)
 {
