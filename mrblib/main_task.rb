@@ -1,15 +1,18 @@
-require 'pio_usb_midi'
-require 'hid_keyboard'
+require 'midi_pico'
 
-loop do
-  ev = PioUsbMidi.receive
-  if ev
-    status, note, velocity = ev
-    if status == PioUsbMidi::NOTE_ON && velocity > 0
-      HidKeyboard.press(0x04)  # 'a'
-    elsif status == PioUsbMidi::NOTE_OFF || (status == PioUsbMidi::NOTE_ON && velocity == 0)
-      HidKeyboard.release_all
-    end
-  end
-  Machine.delay_ms 1
-end
+include MidiPico::Notes
+include MidiPico::Keycodes
+
+mp = MidiPico.new
+
+mp.add_layer :default, {
+  C4 => KC_A,
+  D4 => KC_S,
+  E4 => KC_D,
+  F4 => KC_F,
+  G4 => KC_G,
+  A4 => KC_H,
+  B4 => KC_J,
+}
+
+mp.start!

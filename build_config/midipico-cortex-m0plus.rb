@@ -39,5 +39,6 @@ MRuby::CrossBuild.new("midipico-cortex-m0plus") do |conf|
   conf.gem core: 'picoruby-gpio'
   conf.gem gemdir: '../gems/picoruby-pio-usb-midi'
   conf.gem gemdir: '../gems/picoruby-hid-keyboard'
+  conf.gem gemdir: '../gems/picoruby-midi-pico'
 
 end
