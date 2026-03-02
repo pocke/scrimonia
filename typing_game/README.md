@@ -1,73 +1,58 @@
-# React + TypeScript + Vite
+# MidiPico Typing Game
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MIDIキーボードでのタイピングを練習するための静的Webアプリ。
 
-Currently, two official plugins are available:
+MidiPico が MIDI 入力を HID キーボード入力に変換するので、ブラウザにはただのキーボード入力として届く。このアプリは keymap.rb を読み込んで「どの鍵盤がどの文字に対応するか」を把握し、タイピング練習を提供する。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## セットアップ
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+cd typing_game
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 開発サーバーの起動
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+npm run dev
 ```
+
+ブラウザで表示された URL（通常 http://localhost:5173）を開く。
+
+## 使い方
+
+1. ブラウザでアプリを開く
+2. 自分の `keymap.rb`（`mrblib/main_task.rb` と同じ形式）をドラッグ&ドロップまたはファイル選択でアップロード
+3. パースされたマッピングデータ（ノート名、ベロシティ条件、出力文字）がテーブルで表示される
+
+## ビルド
+
+```sh
+npm run build
+```
+
+`dist/` ディレクトリに静的ファイルが生成される。
+
+## 技術スタック
+
+- [Vite](https://vite.dev/) + [React](https://react.dev/) + TypeScript
+- [Tailwind CSS](https://tailwindcss.com/) v4
+- [@picoruby/wasm-wasi](https://www.npmjs.com/package/@picoruby/wasm-wasi) — keymap.rb のパースに使用
+
+## アーキテクチャ
+
+```
+[MIDIキーボード] → [MidiPico (Pico)] → [HIDキーボード入力] → [ブラウザ タイピングゲーム]
+                                                                    ↑
+                                                            keymap.rb アップロード
+                                                            → PicoRuby.wasm でパース
+                                                            → マッピングデータ取得
+```
+
+### keymap.rb のパース
+
+PicoRuby.wasm を使って keymap.rb をブラウザ上で実行し、MIDI ノート → キーコードのマッピングデータを抽出する。
+
+- `gems/picoruby-midi-pico/mrblib/` の Ruby 定義（Note, Action, Notes, Keycodes）をブラウザ用スタブとして TypeScript 文字列で保持
+- `MidiPico#add_layer` でマッピングデータを収集し、`MidiPico#start!` で `JS.global` 経由で JavaScript に渡す
+- Vite が `@picoruby/wasm-wasi` の `picoruby.js` と `picoruby.wasm` を自動的にビルド出力に含める
