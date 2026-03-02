@@ -67,6 +67,10 @@ mp.add_layer :default, {
   Fs4.with(velocity: hard) => KC_8,
   Gs4.with(velocity: hard) => KC_9,
   As4.with(velocity: hard) => KC_0,
+
+  # Modifiers
+  C3 => KC_LCTL,
+  D3 => KC_LALT,
 }
 
 mp.start!
