@@ -2,8 +2,8 @@ import type { LayerKeymap } from '../types'
 import { hidCodeToChar } from './hidKeycodes'
 
 export interface NoteHint {
-  noteNumber: number
-  noteName: string
+  noteNumbers: number[]
+  noteNames: string[]
   velocity: [number, number] | null
 }
 
@@ -22,8 +22,8 @@ export function buildReverseKeymap(keymap: LayerKeymap): ReverseKeymap {
 
     const char = hidCodeToChar(entry.hidCode, entry.type)
     const hint: NoteHint = {
-      noteNumber: entry.noteNumber,
-      noteName: entry.noteName,
+      noteNumbers: entry.noteNumbers,
+      noteNames: entry.noteNames,
       velocity: entry.velocity,
     }
 

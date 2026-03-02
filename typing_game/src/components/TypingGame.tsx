@@ -5,7 +5,7 @@ import { sampleTexts } from '../lib/sampleTexts'
 
 interface Props {
   keymap: LayerKeymap
-  onHighlightChange: (noteNumber: number | undefined) => void
+  onHighlightChange: (noteNumbers: number[] | undefined) => void
 }
 
 interface GameState {
@@ -39,7 +39,7 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
     const char = game.targetText[game.currentIndex]
     if (char) {
       const hints = reverseKeymap.get(char)
-      onHighlightChange(hints?.[0]?.noteNumber)
+      onHighlightChange(hints?.[0]?.noteNumbers)
     } else {
       onHighlightChange(undefined)
     }

@@ -8,33 +8,47 @@ import {
   WHITE_KEY_HEIGHT,
   BLACK_KEY_WIDTH,
   BLACK_KEY_HEIGHT,
+  type KeyLayout,
 } from '../lib/pianoLayout'
 
 interface Props {
   keymap: LayerKeymap
-  highlightNote?: number
+  highlightNotes?: number[]
 }
 
-export function PianoKeyboard({ keymap, highlightNote }: Props) {
+export function PianoKeyboard({ keymap, highlightNotes }: Props) {
   if (keymap.length === 0) return null
 
-  const noteNumbers = keymap.map(e => e.noteNumber)
-  const minNote = Math.min(...noteNumbers)
-  const maxNote = Math.max(...noteNumbers)
+  const allNoteNumbers = keymap.flatMap(e => e.noteNumbers)
+  const minNote = Math.min(...allNoteNumbers)
+  const maxNote = Math.max(...allNoteNumbers)
 
   const layouts = buildKeyboardLayout(minNote, maxNote)
   const whiteCount = totalWhiteKeys(layouts)
 
   const svgWidth = whiteCount * WHITE_KEY_WIDTH
-  const svgHeight = WHITE_KEY_HEIGHT + 30 // 鍵盤 + ノート名ラベル分
+  const svgHeight = WHITE_KEY_HEIGHT + 30
 
-  // ノート番号ごとのマッピングを構築
+  const highlightSet = new Set(highlightNotes ?? [])
+
+  // ノート番号ごとのマッピングを構築（和音エントリは各ノートに登録）
   const noteMap = new Map<number, KeymapEntry[]>()
   for (const entry of keymap) {
-    const existing = noteMap.get(entry.noteNumber) ?? []
-    existing.push(entry)
-    noteMap.set(entry.noteNumber, existing)
+    for (const noteNum of entry.noteNumbers) {
+      const existing = noteMap.get(noteNum) ?? []
+      existing.push(entry)
+      noteMap.set(noteNum, existing)
+    }
   }
+
+  // 和音エントリの線を描画するためのレイアウトマップ
+  const layoutMap = new Map<number, KeyLayout>()
+  for (const layout of layouts) {
+    layoutMap.set(layout.noteNumber, layout)
+  }
+
+  // 和音エントリ（noteNumbers.length > 1）を収集
+  const chordEntries = keymap.filter(e => e.noteNumbers.length > 1)
 
   const whiteKeys = layouts.filter(k => !k.isBlack)
   const blackKeys = layouts.filter(k => k.isBlack)
@@ -48,7 +62,7 @@ export function PianoKeyboard({ keymap, highlightNote }: Props) {
       {/* 白鍵 */}
       {whiteKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
-        const isHighlighted = key.noteNumber === highlightNote
+        const isHighlighted = highlightSet.has(key.noteNumber)
         const isModifier = entries?.some(e => e.type === 'modifier')
         const hasMappings = entries && entries.length > 0
 
@@ -65,9 +79,7 @@ export function PianoKeyboard({ keymap, highlightNote }: Props) {
               stroke="#374151"
               strokeWidth={1}
             />
-            {/* マッピングラベル */}
             {entries && <KeyLabels entries={entries} x={key.x + WHITE_KEY_WIDTH / 2} isBlack={false} />}
-            {/* ノート名 */}
             <text
               x={key.x + WHITE_KEY_WIDTH / 2}
               y={WHITE_KEY_HEIGHT + 18}
@@ -84,7 +96,7 @@ export function PianoKeyboard({ keymap, highlightNote }: Props) {
       {/* 黒鍵（白鍵の上に描画） */}
       {blackKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
-        const isHighlighted = key.noteNumber === highlightNote
+        const isHighlighted = highlightSet.has(key.noteNumber)
         const isModifier = entries?.some(e => e.type === 'modifier')
         const hasMappings = entries && entries.length > 0
 
@@ -106,6 +118,38 @@ export function PianoKeyboard({ keymap, highlightNote }: Props) {
               rx={2}
             />
             {entries && <KeyLabels entries={entries} x={key.x + BLACK_KEY_WIDTH / 2} isBlack={true} />}
+          </g>
+        )
+      })}
+
+      {/* 和音の接続線 */}
+      {chordEntries.map((entry, i) => {
+        const positions = entry.noteNumbers
+          .map(n => layoutMap.get(n))
+          .filter((l): l is KeyLayout => l != null)
+
+        if (positions.length < 2) return null
+
+        const points = positions.map(l => ({
+          x: l.isBlack ? l.x + BLACK_KEY_WIDTH / 2 : l.x + WHITE_KEY_WIDTH / 2,
+          y: l.isBlack ? BLACK_KEY_HEIGHT + 5 : WHITE_KEY_HEIGHT - 5,
+        }))
+
+        return (
+          <g key={`chord-${i}`}>
+            {points.slice(1).map((p, j) => (
+              <line
+                key={j}
+                x1={points[j].x}
+                y1={points[j].y}
+                x2={p.x}
+                y2={p.y}
+                stroke="#6366f1"
+                strokeWidth={2}
+                strokeDasharray="4,3"
+                opacity={0.7}
+              />
+            ))}
           </g>
         )
       })}
