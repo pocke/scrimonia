@@ -113,38 +113,37 @@ export function PianoKeyboard({ keymap, highlightNote }: Props) {
   )
 }
 
+function velocityLabel(velocity: [number, number] | null): string {
+  if (!velocity) return ''
+  return `${velocity[0]}–${velocity[1]}`
+}
+
 function KeyLabels({ entries, x, isBlack }: { entries: KeymapEntry[], x: number, isBlack: boolean }) {
   const textColor = isBlack ? '#e5e7eb' : '#1f2937'
-  const fontSize = isBlack ? 10 : 12
 
-  if (entries.length === 1) {
-    const label = hidCodeToChar(entries[0].hidCode, entries[0].type)
-    const y = isBlack ? BLACK_KEY_HEIGHT - 12 : WHITE_KEY_HEIGHT - 20
-    return (
-      <text x={x} y={y} textAnchor="middle" fontSize={fontSize} fill={textColor} fontWeight="bold">
-        {label}
-      </text>
-    )
-  }
-
-  // ベロシティで分割されたマッピング: 上下に表示
-  // velocity[0] が小さい方 (soft) を上、大きい方 (hard) を下に
   const sorted = [...entries].sort((a, b) => (a.velocity?.[0] ?? 0) - (b.velocity?.[0] ?? 0))
+  const count = sorted.length
+  const hasVelocity = count > 1
 
   if (isBlack) {
+    const spacing = Math.min(24, (BLACK_KEY_HEIGHT - 20) / count)
+    const startY = 20 + (BLACK_KEY_HEIGHT - 20 - spacing * count) / 2
+
     return (
       <g>
         {sorted.map((entry, i) => {
           const label = hidCodeToChar(entry.hidCode, entry.type)
-          const y = 30 + i * 28
+          const y = startY + i * spacing
           return (
             <g key={i}>
               <text x={x} y={y} textAnchor="middle" fontSize={9} fill={textColor} fontWeight="bold">
                 {label}
               </text>
-              <text x={x} y={y + 11} textAnchor="middle" fontSize={7} fill="#9ca3af">
-                {entry.velocity ? (i === 0 ? '弱' : '強') : ''}
-              </text>
+              {hasVelocity && (
+                <text x={x} y={y + 10} textAnchor="middle" fontSize={6} fill="#9ca3af">
+                  {velocityLabel(entry.velocity)}
+                </text>
+              )}
             </g>
           )
         })}
@@ -152,20 +151,25 @@ function KeyLabels({ entries, x, isBlack }: { entries: KeymapEntry[], x: number,
     )
   }
 
+  const availableHeight = WHITE_KEY_HEIGHT - BLACK_KEY_HEIGHT - 10
+  const spacing = Math.min(28, availableHeight / count)
+  const startY = BLACK_KEY_HEIGHT + 15 + (availableHeight - spacing * count) / 2
+
   return (
     <g>
       {sorted.map((entry, i) => {
         const label = hidCodeToChar(entry.hidCode, entry.type)
-        const baseY = BLACK_KEY_HEIGHT + 15
-        const y = baseY + i * 24
+        const y = startY + i * spacing
         return (
           <g key={i}>
-            <text x={x} y={y} textAnchor="middle" fontSize={fontSize} fill={textColor} fontWeight="bold">
+            <text x={x} y={y} textAnchor="middle" fontSize={12} fill={textColor} fontWeight="bold">
               {label}
             </text>
-            <text x={x} y={y + 13} textAnchor="middle" fontSize={8} fill="#9ca3af">
-              {entry.velocity ? (i === 0 ? '弱' : '強') : ''}
-            </text>
+            {hasVelocity && (
+              <text x={x} y={y + 13} textAnchor="middle" fontSize={7} fill="#9ca3af">
+                {velocityLabel(entry.velocity)}
+              </text>
+            )}
           </g>
         )
       })}
