@@ -9,10 +9,37 @@ class MidiPico
     entries = []
     mapping.each do |key, value|
       if key.is_a?(Array)
-        # 和音はタイピングゲームでは使わないのでスキップ
+        note_numbers = []
+        note_names = []
+        vel_min = nil
+        vel_max = nil
+        key.each do |k|
+          if k.is_a?(Note)
+            note_numbers << k.number
+            note_names << Note.name_for(k.number)
+            # 全ノートのベロシティが同じ場合のみ採用
+            if k.velocity.is_a?(Range)
+              if vel_min.nil?
+                vel_min = k.velocity.first
+                vel_max = k.velocity.last
+              elsif vel_min != k.velocity.first || vel_max != k.velocity.last
+                vel_min = nil
+                vel_max = nil
+              end
+            end
+          else
+            note_numbers << k
+            note_names << Note.name_for(k)
+          end
+        end
+        if value.is_a?(Action::Keycode)
+          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
+        elsif value.is_a?(Action::Modifier)
+          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
+        end
       elsif key.is_a?(Note)
-        note_number = key.number
-        note_name = Note.name_for(key.number)
+        note_numbers = [key.number]
+        note_names = [Note.name_for(key.number)]
         vel_min = nil
         vel_max = nil
         if key.velocity.is_a?(Range)
@@ -20,9 +47,9 @@ class MidiPico
           vel_max = key.velocity.last
         end
         if value.is_a?(Action::Keycode)
-          entries << [note_number, note_name, vel_min, vel_max, "keycode", value.keycode]
+          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
         elsif value.is_a?(Action::Modifier)
-          entries << [note_number, note_name, vel_min, vel_max, "modifier", value.modifier]
+          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
         end
       end
     end
@@ -37,13 +64,15 @@ class MidiPico
     @layers.each do |name, entries|
       entry_strs = []
       entries.each do |e|
+        nums = "[" + e[0].map { |n| n.to_s }.join(",") + "]"
+        names = "[" + e[1].map { |n| '"' + n + '"' }.join(",") + "]"
         vel = if e[2]
           "[" + e[2].to_s + "," + e[3].to_s + "]"
         else
           "null"
         end
-        entry_strs << '{"noteNumber":' + e[0].to_s +
-          ',"noteName":"' + e[1] + '"' +
+        entry_strs << '{"noteNumbers":' + nums +
+          ',"noteNames":' + names +
           ',"velocity":' + vel +
           ',"type":"' + e[4] + '"' +
           ',"hidCode":' + e[5].to_s + '}'

@@ -6,7 +6,7 @@ import { TypingGame } from './components/TypingGame'
 
 function App() {
   const [keymap, setKeymap] = useState<KeymapData | null>(null)
-  const [highlightNote, setHighlightNote] = useState<number | undefined>()
+  const [highlightNotes, setHighlightNotes] = useState<number[] | undefined>()
 
   const defaultLayer = keymap ? (keymap['default'] ?? Object.values(keymap)[0]) : null
 
@@ -19,8 +19,8 @@ function App() {
         <KeymapUploader onKeymapParsed={setKeymap} />
         {defaultLayer && (
           <>
-            <PianoKeyboard keymap={defaultLayer} highlightNote={highlightNote} />
-            <TypingGame keymap={defaultLayer} onHighlightChange={setHighlightNote} />
+            <PianoKeyboard keymap={defaultLayer} highlightNotes={highlightNotes} />
+            <TypingGame keymap={defaultLayer} onHighlightChange={setHighlightNotes} />
           </>
         )}
       </main>

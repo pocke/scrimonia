@@ -1,6 +1,6 @@
 export interface KeymapEntry {
-  noteNumber: number
-  noteName: string
+  noteNumbers: number[]
+  noteNames: string[]
   velocity: [number, number] | null
   type: 'keycode' | 'modifier'
   hidCode: number
