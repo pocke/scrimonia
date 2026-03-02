@@ -1,0 +1,10 @@
+export interface KeymapEntry {
+  noteNumber: number
+  noteName: string
+  velocity: [number, number] | null
+  type: 'keycode' | 'modifier'
+  hidCode: number
+}
+
+export type LayerKeymap = KeymapEntry[]
+export type KeymapData = Record<string, LayerKeymap>
