@@ -71,6 +71,8 @@ mp.add_layer :default, {
   # Modifiers
   C3 => KC_LCTL,
   D3 => KC_LALT,
+
+  [D4, E4] => KC_ESC,
 }
 
 mp.start!
