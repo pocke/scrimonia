@@ -25,6 +25,7 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
     startTime: null,
   }))
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [shakeKey, setShakeKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const reverseKeymap = useMemo(() => buildReverseKeymap(keymap), [keymap])
@@ -53,6 +54,10 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
     return () => clearInterval(interval)
   }, [game.status, game.startTime])
 
+  const triggerShake = useCallback(() => {
+    setShakeKey(k => k + 1)
+  }, [])
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (game.status === 'finished') return
@@ -76,6 +81,7 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
             startTime: Date.now(),
           }
         }
+        triggerShake()
         return { ...prev, status: 'playing', startTime: Date.now(), errors: prev.errors + 1 }
       }
 
@@ -87,9 +93,10 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
           currentIndex: next,
         }
       }
+      triggerShake()
       return { ...prev, errors: prev.errors + 1 }
     })
-  }, [game.status])
+  }, [game.status, triggerShake])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -133,13 +140,18 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
   return (
     <div ref={containerRef} tabIndex={-1} className="outline-none space-y-6">
       {/* お題テキスト */}
-      <div className="bg-gray-800 rounded-lg p-6 font-mono text-2xl leading-relaxed tracking-wide select-none">
+      <div
+        key={shakeKey}
+        className={`bg-gray-800 rounded-lg p-6 font-mono text-2xl leading-relaxed tracking-wide select-none ${shakeKey > 0 ? 'animate-shake' : ''}`}
+      >
         {game.targetText.split('').map((char, i) => {
           let className = 'text-gray-500'
           if (i < game.currentIndex) {
             className = 'text-green-400'
           } else if (i === game.currentIndex) {
-            className = 'text-white underline underline-offset-4 decoration-blue-400'
+            className = shakeKey > 0
+              ? 'text-red-400 underline underline-offset-4 decoration-red-400'
+              : 'text-white underline underline-offset-4 decoration-blue-400'
           }
           return (
             <span key={i} className={className}>
