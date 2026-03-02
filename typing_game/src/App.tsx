@@ -2,9 +2,11 @@ import { useState } from 'react'
 import type { KeymapData } from './types'
 import { KeymapUploader } from './components/KeymapUploader'
 import { PianoKeyboard } from './components/PianoKeyboard'
+import { TypingGame } from './components/TypingGame'
 
 function App() {
   const [keymap, setKeymap] = useState<KeymapData | null>(null)
+  const [highlightNote, setHighlightNote] = useState<number | undefined>()
 
   const defaultLayer = keymap ? (keymap['default'] ?? Object.values(keymap)[0]) : null
 
@@ -15,7 +17,12 @@ function App() {
       </header>
       <main className="max-w-5xl mx-auto p-8 space-y-8">
         <KeymapUploader onKeymapParsed={setKeymap} />
-        {defaultLayer && <PianoKeyboard keymap={defaultLayer} />}
+        {defaultLayer && (
+          <>
+            <PianoKeyboard keymap={defaultLayer} highlightNote={highlightNote} />
+            <TypingGame keymap={defaultLayer} onHighlightChange={setHighlightNote} />
+          </>
+        )}
       </main>
     </div>
   )
