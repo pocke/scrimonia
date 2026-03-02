@@ -21,17 +21,23 @@ function loadModule(): Promise<EmscriptenModule> {
 
 /**
  * PicoRuby.wasm を初期化し、Ruby ソースコードを実行する。
- * タスクが完了（全タスクが dormant）したら resolve する。
+ * isDone コールバックが true を返したら resolve する。
+ *
+ * PicoRuby.wasm の js gem はイベントループを維持するため、
+ * mrbc_run_step が < 0 (全タスク終了) を返すことがない。
+ * そのため、タスク終了ではなく isDone で完了を判定する。
  */
-export async function executeRuby(source: string): Promise<void> {
+export async function executeRuby(source: string, isDone: () => boolean): Promise<void> {
   const Module = await loadModule()
 
   Module.ccall('picorb_init', 'number', [], [])
   Module.ccall('picorb_create_task', 'number', ['string'], [source])
 
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     const MRBC_TICK_UNIT = 8.1
+    const MAX_STEPS = 100_000
     let lastTime = performance.now()
+    let stepCount = 0
 
     function run() {
       const currentTime = performance.now()
@@ -39,9 +45,20 @@ export async function executeRuby(source: string): Promise<void> {
         Module.ccall('mrbc_tick', null, [], [])
         lastTime = currentTime
       }
-      const result = Module.ccall('mrbc_run_step', 'number', [], [], { async: true }) as number
+
+      const result = Module.ccall('mrbc_run_step', 'number', [], []) as number
+      stepCount++
+
+      if (isDone()) {
+        resolve()
+        return
+      }
       if (result < 0) {
         resolve()
+        return
+      }
+      if (stepCount >= MAX_STEPS) {
+        reject(new Error(`PicoRuby の実行が ${MAX_STEPS} ステップを超えました`))
         return
       }
       setTimeout(run, 0)

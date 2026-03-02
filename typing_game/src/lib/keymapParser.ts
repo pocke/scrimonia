@@ -20,7 +20,7 @@ export async function parseKeymap(keymapRbContent: string): Promise<KeymapData> 
   delete window.midiPicoKeymapDataJson
 
   const source = buildRubySource(keymapRbContent)
-  await executeRuby(source)
+  await executeRuby(source, () => window.midiPicoKeymapDataJson != null)
 
   const json = window.midiPicoKeymapDataJson
   if (!json) {
