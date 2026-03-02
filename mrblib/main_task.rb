@@ -73,6 +73,7 @@ mp.add_layer :default, {
   D3 => KC_LALT,
 
   [D4, E4] => KC_ESC,
+  [B3, C4] => KC_SPC,
 }
 
 mp.start!
