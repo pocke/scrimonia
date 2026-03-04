@@ -21,11 +21,15 @@ class MidiPico
     chords = []
     mapping.each do |key, value|
       if key.is_a?(Array)
-        notes = []
+        pairs = []
         key.each do |k|
-          notes << (k.is_a?(Note) ? k.number : k)
+          if k.is_a?(Note)
+            pairs << [k.number, k.velocity]
+          else
+            pairs << [k, nil]
+          end
         end
-        chords << [sort_notes(notes), value]
+        chords << [insertion_sort(pairs) { |x| x[0] }, value]
       else
         if key.is_a?(Note)
           note_number = key.number
@@ -42,8 +46,8 @@ class MidiPico
     # 和音に含まれるノートを高速判定するための集合
     chord_note_set = {}
     chords.each do |entry|
-      entry[0].each do |n|
-        chord_note_set[n] = true
+      entry[0].each do |pair|
+        chord_note_set[pair[0]] = true
       end
     end
 
@@ -81,7 +85,7 @@ class MidiPico
             pending_start = tick if pending.size == 1
 
             sorted = pending_sorted_notes(pending)
-            chord_action = find_chord(sorted, chords)
+            chord_action = find_chord(sorted, pending, chords)
             if chord_action
               active_chord_action = chord_action
               active_chord_notes = sorted
@@ -173,25 +177,66 @@ class MidiPico
     pending.each do |p|
       notes << p[0]
     end
-    sort_notes(notes)
+    insertion_sort(notes) { |x| x }
   end
 
-  # 和音定義リストから完全マッチを線形探索
-  def find_chord(sorted_notes, chords)
+  # 和音定義リストからノート番号+ベロシティ条件の完全マッチを線形探索
+  def find_chord(sorted_notes, pending, chords)
     chords.each do |entry|
-      return entry[1] if arrays_equal?(sorted_notes, entry[0])
+      chord_pairs = entry[0]
+      # ノート数が一致するか
+      next if sorted_notes.size != chord_pairs.size
+      # 全ノート番号が一致するか
+      note_match = true
+      i = 0
+      while i < sorted_notes.size
+        unless sorted_notes[i] == chord_pairs[i][0]
+          note_match = false
+          break
+        end
+        i += 1
+      end
+      next unless note_match
+      # ベロシティ条件を検査
+      vel_match = true
+      chord_pairs.each do |pair|
+        vel_cond = pair[1]
+        if vel_cond
+          # pending から該当ノートのベロシティを取得
+          vel = nil
+          pending.each do |p|
+            if p[0] == pair[0]
+              vel = p[1]
+              break
+            end
+          end
+          unless vel_cond === vel
+            vel_match = false
+            break
+          end
+        end
+      end
+      return entry[1] if vel_match
     end
     nil
   end
 
   # sorted_notes がいずれかの和音定義の部分集合かを判定
+  # (ノート番号のみで判定、ベロシティは完全マッチ時に検査する)
   def prefix_of_any_chord?(sorted_notes, chords)
     chords.each do |entry|
-      chord = entry[0]
-      if sorted_notes.size <= chord.size
+      chord_pairs = entry[0]
+      if sorted_notes.size <= chord_pairs.size
         all_found = true
         sorted_notes.each do |n|
-          unless chord.include?(n)
+          found = false
+          chord_pairs.each do |pair|
+            if pair[0] == n
+              found = true
+              break
+            end
+          end
+          unless found
             all_found = false
             break
           end
@@ -230,17 +275,31 @@ class MidiPico
     false
   end
 
-  # Integer 配列の挿入ソート (mruby/c に Array#sort がないため)
-  def sort_notes(arr)
+  # 挿入ソート (mruby/c に Array#sort がないため)
+  # ブロックでソートキーを抽出する。Ruby の sort_by と同様の使い方:
+  #   insertion_sort(pairs) { |x| x[0] }
+  #   insertion_sort(notes) { |x| x }
+  # ソートキーを事前計算して yield 呼び出しを O(n) に抑える。
+  def insertion_sort(arr)
+    keys = []
+    i = 0
+    while i < arr.size
+      keys << yield(arr[i])
+      i += 1
+    end
+
     i = 1
     while i < arr.size
-      key = arr[i]
+      val = arr[i]
+      val_key = keys[i]
       j = i - 1
-      while j >= 0 && arr[j] > key
+      while j >= 0 && keys[j] > val_key
         arr[j + 1] = arr[j]
+        keys[j + 1] = keys[j]
         j -= 1
       end
-      arr[j + 1] = key
+      arr[j + 1] = val
+      keys[j + 1] = val_key
       i += 1
     end
     arr
