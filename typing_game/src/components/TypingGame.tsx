@@ -154,7 +154,15 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-    if (game.status === 'finished') return
+
+    if (game.status === 'finished') {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        setGame(createNewGameState(game.mode))
+        setElapsedMs(0)
+      }
+      return
+    }
 
     const key = e.key
     if (key.length !== 1) return
@@ -360,7 +368,7 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
                 onClick={handleNext}
                 className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 text-white text-sm"
               >
-                次のお題
+                次のお題 (Enter)
               </button>
             </div>
           </div>
