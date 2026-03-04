@@ -10,6 +10,7 @@ import {
   getNextExpectedChars,
   getRemainingRomaji,
 } from '../lib/romajiMatcher'
+import type { RomajiPreferences } from '../lib/romajiPreferences'
 
 export type GameMode = 'en' | 'ja'
 
@@ -17,6 +18,7 @@ interface Props {
   keymap: LayerKeymap
   onHighlightChange: (noteNumbers: number[] | undefined) => void
   mode: GameMode
+  romajiPreferences: RomajiPreferences
 }
 
 interface GameState {
@@ -92,7 +94,7 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
+export function TypingGame({ keymap, onHighlightChange, mode, romajiPreferences }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
@@ -126,7 +128,7 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
         onHighlightChange(undefined)
       }
     } else if (game.romajiState) {
-      const nextChars = getNextExpectedChars(game.romajiState)
+      const nextChars = getNextExpectedChars(game.romajiState, romajiPreferences)
       if (nextChars.length > 0) {
         const allNotes = nextChars.flatMap(ch => {
           const hints = reverseKeymap.get(ch)
@@ -137,7 +139,7 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
         onHighlightChange(undefined)
       }
     }
-  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange])
+  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, romajiPreferences])
 
   // Elapsed time timer
   useEffect(() => {
@@ -330,7 +332,7 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
             <div className="text-lg">
               <span className="text-green-400">{game.romajiState.confirmedRomaji}</span>
               <span className="text-white">{game.romajiState.currentInput}</span>
-              <span className="text-gray-600">{getRemainingRomaji(game.romajiState)}</span>
+              <span className="text-gray-600">{getRemainingRomaji(game.romajiState, 10, romajiPreferences)}</span>
             </div>
           </div>
         ) : null}
