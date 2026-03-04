@@ -55,7 +55,7 @@ class MidiPico
     def handle_note_on(note, velocity)
       print "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}\r\n"
 
-      if @has_chords && @chord_note_set[note]
+      if @chord_note_set[note]
         @pending << [note, velocity]
         @pending_start = @tick if @pending.size == 1
 
@@ -112,7 +112,6 @@ class MidiPico
       @active_layer_name = layer_name
       layer = @layers[@active_layer_name]
       @singles, @chords, @chord_note_set = layer
-      @has_chords = @chords.size > 0
     end
 
     def press_action(action)
