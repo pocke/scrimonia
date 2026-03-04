@@ -55,7 +55,8 @@ class MidiPico
   end
 
   def start!
-    layer = @layers[:default]
+    active_layer_name = :default
+    layer = @layers[active_layer_name]
     raise "No :default layer defined" unless layer
 
     singles, chords, chord_note_set = layer
@@ -65,6 +66,9 @@ class MidiPico
     # 押下中のノートとそのアクションを記録する
     pressed = {}
     modifier_state = 0
+
+    # :hold モードの LayerChange で押下中のノートと戻り先レイヤーを記録
+    hold_returns = {}
 
     # 和音判定用: ノート入力を一時バッファして和音マッチを試みる
     pending = []
@@ -87,31 +91,55 @@ class MidiPico
             sorted = pending_sorted_notes(pending)
             chord_action = find_chord(sorted, pending, chords)
             if chord_action
-              active_chord_action = chord_action
-              active_chord_notes = sorted
-              if chord_action.is_a?(Action::Modifier)
-                modifier_state = modifier_state | chord_action.modifier
-                HidKeyboard.press(0, modifier_state)
-              elsif chord_action.is_a?(Action::Keycode)
-                HidKeyboard.press(chord_action.keycode, modifier_state)
+              if chord_action.is_a?(Action::LayerChange)
+                if chord_action.mode == :hold
+                  sorted.each do |n|
+                    hold_returns[n] = active_layer_name
+                  end
+                end
+                active_layer_name = chord_action.layer_name
+                layer = @layers[active_layer_name]
+                singles, chords, chord_note_set = layer
+                has_chords = chords.size > 0
+              else
+                active_chord_action = chord_action
+                active_chord_notes = sorted
+                if chord_action.is_a?(Action::Modifier)
+                  modifier_state = modifier_state | chord_action.modifier
+                  HidKeyboard.press(0, modifier_state)
+                elsif chord_action.is_a?(Action::Keycode)
+                  HidKeyboard.press(chord_action.keycode, modifier_state)
+                end
               end
               pending.clear
             elsif !prefix_of_any_chord?(sorted, chords)
-              modifier_state = flush_pending(pending, singles, pressed, modifier_state)
+              modifier_state, active_layer_name, singles, chords, chord_note_set, has_chords =
+                flush_pending(pending, singles, pressed, modifier_state, hold_returns, active_layer_name)
               pending.clear
             end
           else
             if pending.size > 0
-              modifier_state = flush_pending(pending, singles, pressed, modifier_state)
+              modifier_state, active_layer_name, singles, chords, chord_note_set, has_chords =
+                flush_pending(pending, singles, pressed, modifier_state, hold_returns, active_layer_name)
               pending.clear
             end
             action = find_action(singles[note], velocity)
-            pressed[note] = action
-            if action.is_a?(Action::Modifier)
-              modifier_state = modifier_state | action.modifier
-              HidKeyboard.press(0, modifier_state)
-            elsif action.is_a?(Action::Keycode)
-              HidKeyboard.press(action.keycode, modifier_state)
+            if action.is_a?(Action::LayerChange)
+              if action.mode == :hold
+                hold_returns[note] = active_layer_name
+              end
+              active_layer_name = action.layer_name
+              layer = @layers[active_layer_name]
+              singles, chords, chord_note_set = layer
+              has_chords = chords.size > 0
+            elsif action
+              pressed[note] = action
+              if action.is_a?(Action::Modifier)
+                modifier_state = modifier_state | action.modifier
+                HidKeyboard.press(0, modifier_state)
+              elsif action.is_a?(Action::Keycode)
+                HidKeyboard.press(action.keycode, modifier_state)
+              end
             end
           end
 
@@ -122,6 +150,11 @@ class MidiPico
           # (和音判定中の超短タップ — 実用上はほぼ起きない)
           if remove_from_pending(pending, note)
             # removed from pending, nothing else to do
+          elsif hold_returns[note]
+            active_layer_name = hold_returns.delete(note)
+            layer = @layers[active_layer_name]
+            singles, chords, chord_note_set = layer
+            has_chords = chords.size > 0
           elsif active_chord_notes.include?(note)
             if active_chord_action.is_a?(Action::Modifier)
               modifier_state = modifier_state & ~active_chord_action.modifier
@@ -148,7 +181,8 @@ class MidiPico
       end
 
       if pending.size > 0 && (tick - pending_start) >= CHORD_TIMEOUT_MS
-        modifier_state = flush_pending(pending, singles, pressed, modifier_state)
+        modifier_state, active_layer_name, singles, chords, chord_note_set, has_chords =
+          flush_pending(pending, singles, pressed, modifier_state, hold_returns, active_layer_name)
         pending.clear
       end
 
@@ -247,19 +281,33 @@ class MidiPico
     false
   end
 
-  # pending 内の全ノートを単体ノートとして発火する
-  def flush_pending(pending, singles, pressed, modifier_state)
+  # pending 内の全ノートを単体ノートとして発火する。
+  # LayerChange が含まれる場合はレイヤー切替を行い、
+  # 切替後のレイヤーデータを呼び出し元に返す。
+  def flush_pending(pending, singles, pressed, modifier_state, hold_returns, active_layer_name)
     pending.each do |p|
       action = find_action(singles[p[0]], p[1])
-      pressed[p[0]] = action
-      if action.is_a?(Action::Modifier)
-        modifier_state = modifier_state | action.modifier
-        HidKeyboard.press(0, modifier_state)
-      elsif action.is_a?(Action::Keycode)
-        HidKeyboard.press(action.keycode, modifier_state)
+      if action.is_a?(Action::LayerChange)
+        if action.mode == :hold
+          hold_returns[p[0]] = active_layer_name
+        end
+        active_layer_name = action.layer_name
+        layer = @layers[active_layer_name]
+        singles, _chords, _chord_note_set = layer
+      elsif action
+        pressed[p[0]] = action
+        if action.is_a?(Action::Modifier)
+          modifier_state = modifier_state | action.modifier
+          HidKeyboard.press(0, modifier_state)
+        elsif action.is_a?(Action::Keycode)
+          HidKeyboard.press(action.keycode, modifier_state)
+        end
       end
     end
-    modifier_state
+    layer = @layers[active_layer_name]
+    singles, chords, chord_note_set = layer
+    has_chords = chords.size > 0
+    [modifier_state, active_layer_name, singles, chords, chord_note_set, has_chords]
   end
 
   # pending から指定ノートを除去。除去できたら true を返す
