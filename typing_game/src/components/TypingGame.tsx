@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { LayerKeymap } from '../types'
 import { buildReverseKeymap } from '../lib/reverseKeymap'
 import { sampleTexts } from '../lib/sampleTexts'
-import { sampleTextsJa } from '../lib/sampleTextsJa'
+import { sampleTextsJa, type JapaneseSampleText } from '../lib/sampleTextsJa'
 import {
   type RomajiInputState,
   createInitialState,
@@ -23,34 +23,77 @@ interface GameState {
   status: 'idle' | 'playing' | 'finished'
   mode: GameMode
   targetText: string
+  displayText: string | null  // Kanji display for ja mode
   currentIndex: number
   errors: number
   startTime: number | null
   romajiState: RomajiInputState | null
 }
 
-function pickText(mode: GameMode): string {
-  if (mode === 'ja') {
-    return sampleTextsJa[Math.floor(Math.random() * sampleTextsJa.length)]
-  }
+function pickJaText(): JapaneseSampleText {
+  return sampleTextsJa[Math.floor(Math.random() * sampleTextsJa.length)]
+}
+
+function pickEnText(): string {
   return sampleTexts[Math.floor(Math.random() * sampleTexts.length)]
 }
 
-function createGameState(mode: GameMode, text?: string): GameState {
-  const targetText = text ?? pickText(mode)
+function createGameState(mode: GameMode, retryText?: { targetText: string; displayText: string | null }): GameState {
+  if (mode === 'ja') {
+    const kana = retryText?.targetText ?? pickJaText().kana
+    const display = retryText?.displayText ?? sampleTextsJa.find(t => t.kana === kana)?.display ?? kana
+    return {
+      status: 'idle',
+      mode,
+      targetText: kana,
+      displayText: display,
+      currentIndex: 0,
+      errors: 0,
+      startTime: null,
+      romajiState: createInitialState(kana),
+    }
+  }
+  const text = retryText?.targetText ?? pickEnText()
   return {
     status: 'idle',
     mode,
-    targetText,
+    targetText: text,
+    displayText: null,
     currentIndex: 0,
     errors: 0,
     startTime: null,
-    romajiState: mode === 'ja' ? createInitialState(targetText) : null,
+    romajiState: null,
+  }
+}
+
+function createNewGameState(mode: GameMode): GameState {
+  if (mode === 'ja') {
+    const sample = pickJaText()
+    return {
+      status: 'idle',
+      mode,
+      targetText: sample.kana,
+      displayText: sample.display,
+      currentIndex: 0,
+      errors: 0,
+      startTime: null,
+      romajiState: createInitialState(sample.kana),
+    }
+  }
+  return {
+    status: 'idle',
+    mode,
+    targetText: pickEnText(),
+    displayText: null,
+    currentIndex: 0,
+    errors: 0,
+    startTime: null,
+    romajiState: null,
   }
 }
 
 export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
-  const [game, setGame] = useState<GameState>(() => createGameState(mode))
+  const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -59,7 +102,7 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
 
   // Reset game when mode changes
   useEffect(() => {
-    setGame(createGameState(mode))
+    setGame(createNewGameState(mode))
     setElapsedMs(0)
   }, [mode])
 
@@ -203,12 +246,12 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
   }, [])
 
   const handleRetry = () => {
-    setGame(createGameState(game.mode, game.targetText))
+    setGame(createGameState(game.mode, { targetText: game.targetText, displayText: game.displayText }))
     setElapsedMs(0)
   }
 
   const handleNext = () => {
-    setGame(createGameState(game.mode))
+    setGame(createNewGameState(game.mode))
     setElapsedMs(0)
   }
 
@@ -249,8 +292,14 @@ export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
             })}
           </div>
         ) : game.romajiState ? (
-          // Romaji mode: two-line display (kana + romaji guide)
+          // Romaji mode: three-line display (kanji + kana + romaji guide)
           <div className="space-y-3">
+            {/* Kanji display line */}
+            {game.displayText && (
+              <div className="text-xl leading-relaxed tracking-wide text-gray-300">
+                {game.displayText}
+              </div>
+            )}
             {/* Kana line */}
             <div className="text-2xl leading-relaxed tracking-wide">
               {game.romajiState.chunks.map((chunk, i) => {
