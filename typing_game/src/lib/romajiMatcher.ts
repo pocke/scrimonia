@@ -1,4 +1,5 @@
 import { type RomajiChunk, textToRomajiChunks } from './romajiTable'
+import { type RomajiPreferences, getPreferredCandidate } from './romajiPreferences'
 
 export interface RomajiInputState {
   chunks: RomajiChunk[]
@@ -65,17 +66,34 @@ export function processKey(state: RomajiInputState, key: string): InputResult {
 /**
  * Returns the set of valid next characters the user can type.
  * Used for piano keyboard highlighting.
+ * When preferences are provided, only the preferred candidate is used
+ * so that only one style's keys are highlighted.
  */
-export function getNextExpectedChars(state: RomajiInputState): string[] {
+export function getNextExpectedChars(state: RomajiInputState, preferences?: RomajiPreferences): string[] {
   const chunk = state.chunks[state.currentChunkIndex]
   if (!chunk) return []
 
   const { currentInput } = state
   const nextChars = new Set<string>()
 
-  for (const candidate of chunk.candidates) {
-    if (candidate.startsWith(currentInput) && candidate.length > currentInput.length) {
-      nextChars.add(candidate[currentInput.length])
+  if (preferences) {
+    const preferred = getPreferredCandidate(chunk, preferences)
+    if (preferred.startsWith(currentInput) && preferred.length > currentInput.length) {
+      nextChars.add(preferred[currentInput.length])
+    }
+    // If user is already typing a non-preferred path, fall back to all matching candidates
+    if (nextChars.size === 0) {
+      for (const candidate of chunk.candidates) {
+        if (candidate.startsWith(currentInput) && candidate.length > currentInput.length) {
+          nextChars.add(candidate[currentInput.length])
+        }
+      }
+    }
+  } else {
+    for (const candidate of chunk.candidates) {
+      if (candidate.startsWith(currentInput) && candidate.length > currentInput.length) {
+        nextChars.add(candidate[currentInput.length])
+      }
     }
   }
 
@@ -84,30 +102,46 @@ export function getNextExpectedChars(state: RomajiInputState): string[] {
 
 /**
  * Returns the remaining romaji hint for display.
- * Shows the shortest matching candidate's remaining portion, plus subsequent chunks.
+ * When preferences are provided, uses the preferred candidate for each chunk.
+ * Otherwise falls back to the shortest matching candidate.
  */
-export function getRemainingRomaji(state: RomajiInputState, maxChunks: number = 10): string {
+export function getRemainingRomaji(state: RomajiInputState, maxChunks: number = 10, preferences?: RomajiPreferences): string {
   const { chunks, currentChunkIndex, currentInput } = state
 
   let result = ''
 
-  // Current chunk: show remaining portion of the best (shortest) matching candidate
+  // Current chunk: show remaining portion of the preferred or shortest matching candidate
   const chunk = chunks[currentChunkIndex]
   if (chunk) {
-    const matching = chunk.candidates
-      .filter(c => c.startsWith(currentInput))
-      .sort((a, b) => a.length - b.length)
-    if (matching.length > 0) {
-      result += matching[0].slice(currentInput.length)
+    if (preferences) {
+      const preferred = getPreferredCandidate(chunk, preferences)
+      if (preferred.startsWith(currentInput)) {
+        result += preferred.slice(currentInput.length)
+      } else {
+        // User is typing a non-preferred path; fall back to shortest matching
+        const matching = chunk.candidates
+          .filter(c => c.startsWith(currentInput))
+          .sort((a, b) => a.length - b.length)
+        if (matching.length > 0) {
+          result += matching[0].slice(currentInput.length)
+        }
+      }
+    } else {
+      const matching = chunk.candidates
+        .filter(c => c.startsWith(currentInput))
+        .sort((a, b) => a.length - b.length)
+      if (matching.length > 0) {
+        result += matching[0].slice(currentInput.length)
+      }
     }
   }
 
-  // Subsequent chunks: show first candidate of each
+  // Subsequent chunks: show preferred candidate of each
   const end = Math.min(chunks.length, currentChunkIndex + 1 + maxChunks)
   for (let i = currentChunkIndex + 1; i < end; i++) {
     const c = chunks[i]
     if (c.candidates.length > 0) {
-      result += c.candidates[0]
+      result += preferences ? getPreferredCandidate(c, preferences) : c.candidates[0]
     }
   }
 
