@@ -1,4 +1,3 @@
-# CLAUDE.md
 
 ## ビルド
 
@@ -31,3 +30,7 @@ rake all
 rake clean       # ビルド成果物のクリーン
 rake deep_clean  # libmruby の中間ファイルも含めた完全クリーン
 ```
+
+## 他
+
+プロジェクト構成を知るには README.md を読むこと。
