@@ -87,6 +87,14 @@ D+ に外部プルアップ抵抗は不要。USB Host は D+/D- にプルダウ�
 
 - システムクロックを 120MHz に設定する必要がある（PIO USB は 12MHz の倍数を要求する。デフォルト 125MHz では USB bit timing が合わない）
 
+## タイピングゲーム (`typing_game/`)
+
+MidiPico 用のタイピング練習 Web アプリケーション。
+
+ユーザーの `keymap.rb` をブラウザ上で読み込み、MIDI キーボードでのタイピング練習ができる。
+
+詳細は `typing_game/README.md`を参照。
+
 ## 依存ライブラリ
 
 - [PicoRuby](https://github.com/picoruby/picoruby) — RP2040 向け Ruby 実装
