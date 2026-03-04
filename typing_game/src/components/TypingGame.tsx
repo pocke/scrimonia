@@ -2,55 +2,101 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { LayerKeymap } from '../types'
 import { buildReverseKeymap } from '../lib/reverseKeymap'
 import { sampleTexts } from '../lib/sampleTexts'
+import { sampleTextsJa } from '../lib/sampleTextsJa'
+import {
+  type RomajiInputState,
+  createInitialState,
+  processKey,
+  getNextExpectedChars,
+  getRemainingRomaji,
+} from '../lib/romajiMatcher'
+
+export type GameMode = 'en' | 'ja'
 
 interface Props {
   keymap: LayerKeymap
   onHighlightChange: (noteNumbers: number[] | undefined) => void
+  mode: GameMode
 }
 
 interface GameState {
   status: 'idle' | 'playing' | 'finished'
+  mode: GameMode
   targetText: string
   currentIndex: number
   errors: number
   startTime: number | null
+  romajiState: RomajiInputState | null
 }
 
-export function TypingGame({ keymap, onHighlightChange }: Props) {
-  const [game, setGame] = useState<GameState>(() => ({
+function pickText(mode: GameMode): string {
+  if (mode === 'ja') {
+    return sampleTextsJa[Math.floor(Math.random() * sampleTextsJa.length)]
+  }
+  return sampleTexts[Math.floor(Math.random() * sampleTexts.length)]
+}
+
+function createGameState(mode: GameMode, text?: string): GameState {
+  const targetText = text ?? pickText(mode)
+  return {
     status: 'idle',
-    targetText: sampleTexts[Math.floor(Math.random() * sampleTexts.length)],
+    mode,
+    targetText,
     currentIndex: 0,
     errors: 0,
     startTime: null,
-  }))
+    romajiState: mode === 'ja' ? createInitialState(targetText) : null,
+  }
+}
+
+export function TypingGame({ keymap, onHighlightChange, mode }: Props) {
+  const [game, setGame] = useState<GameState>(() => createGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const reverseKeymap = useMemo(() => buildReverseKeymap(keymap), [keymap])
 
-  // 現在の文字に対応するノートをハイライト
+  // Reset game when mode changes
+  useEffect(() => {
+    setGame(createGameState(mode))
+    setElapsedMs(0)
+  }, [mode])
+
+  // Highlight notes for the next expected key
   useEffect(() => {
     if (game.status === 'finished') {
       onHighlightChange(undefined)
       return
     }
-    const char = game.targetText[game.currentIndex]
-    if (char) {
-      const hints = reverseKeymap.get(char)
-      if (hints && hints.length > 0) {
-        const allNotes = hints.flatMap(h => h.noteNumbers)
-        onHighlightChange(allNotes)
+
+    if (game.mode === 'en') {
+      const char = game.targetText[game.currentIndex]
+      if (char) {
+        const hints = reverseKeymap.get(char)
+        if (hints && hints.length > 0) {
+          onHighlightChange(hints.flatMap(h => h.noteNumbers))
+        } else {
+          onHighlightChange(undefined)
+        }
       } else {
         onHighlightChange(undefined)
       }
-    } else {
-      onHighlightChange(undefined)
+    } else if (game.romajiState) {
+      const nextChars = getNextExpectedChars(game.romajiState)
+      if (nextChars.length > 0) {
+        const allNotes = nextChars.flatMap(ch => {
+          const hints = reverseKeymap.get(ch)
+          return hints ? hints.flatMap(h => h.noteNumbers) : []
+        })
+        onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
+      } else {
+        onHighlightChange(undefined)
+      }
     }
-  }, [game.currentIndex, game.targetText, game.status, reverseKeymap, onHighlightChange])
+  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange])
 
-  // 経過時間の更新
+  // Elapsed time timer
   useEffect(() => {
     if (game.status !== 'playing' || !game.startTime) return
     const interval = setInterval(() => {
@@ -72,74 +118,108 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
 
     e.preventDefault()
 
-    setGame(prev => {
-      const target = prev.targetText[prev.currentIndex]
-      if (!target) return prev
+    if (game.mode === 'en') {
+      // English mode: existing logic
+      setGame(prev => {
+        const target = prev.targetText[prev.currentIndex]
+        if (!target) return prev
 
-      if (prev.status === 'idle') {
+        if (prev.status === 'idle') {
+          if (key === target) {
+            const next = prev.currentIndex + 1
+            return {
+              ...prev,
+              status: next >= prev.targetText.length ? 'finished' : 'playing',
+              currentIndex: next,
+              startTime: Date.now(),
+            }
+          }
+          triggerShake()
+          return { ...prev, status: 'playing', startTime: Date.now(), errors: prev.errors + 1 }
+        }
+
         if (key === target) {
           const next = prev.currentIndex + 1
           return {
             ...prev,
-            status: next >= prev.targetText.length ? 'finished' : 'playing',
+            status: next >= prev.targetText.length ? 'finished' : prev.status,
             currentIndex: next,
-            startTime: Date.now(),
           }
         }
         triggerShake()
-        return { ...prev, status: 'playing', startTime: Date.now(), errors: prev.errors + 1 }
-      }
+        return { ...prev, errors: prev.errors + 1 }
+      })
+    } else {
+      // Romaji mode
+      setGame(prev => {
+        if (!prev.romajiState) return prev
 
-      if (key === target) {
-        const next = prev.currentIndex + 1
-        return {
-          ...prev,
-          status: next >= prev.targetText.length ? 'finished' : prev.status,
-          currentIndex: next,
+        const result = processKey(prev.romajiState, key)
+
+        switch (result.type) {
+          case 'pending':
+            return {
+              ...prev,
+              status: prev.status === 'idle' ? 'playing' : prev.status,
+              startTime: prev.startTime ?? Date.now(),
+              romajiState: result.nextState,
+            }
+          case 'advance':
+            return {
+              ...prev,
+              status: prev.status === 'idle' ? 'playing' : prev.status,
+              startTime: prev.startTime ?? Date.now(),
+              currentIndex: result.nextState.currentChunkIndex,
+              romajiState: result.nextState,
+            }
+          case 'complete':
+            return {
+              ...prev,
+              status: 'finished',
+              currentIndex: result.nextState.currentChunkIndex,
+              romajiState: result.nextState,
+            }
+          case 'error':
+            triggerShake()
+            return {
+              ...prev,
+              status: prev.status === 'idle' ? 'playing' : prev.status,
+              startTime: prev.startTime ?? Date.now(),
+              errors: prev.errors + 1,
+            }
         }
-      }
-      triggerShake()
-      return { ...prev, errors: prev.errors + 1 }
-    })
-  }, [game.status, triggerShake])
+      })
+    }
+  }, [game.status, game.mode, triggerShake])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // コンポーネント表示時にフォーカス
+  // Focus on mount
   useEffect(() => {
     containerRef.current?.focus()
   }, [])
 
   const handleRetry = () => {
-    setGame({
-      status: 'idle',
-      targetText: game.targetText,
-      currentIndex: 0,
-      errors: 0,
-      startTime: null,
-    })
+    setGame(createGameState(game.mode, game.targetText))
     setElapsedMs(0)
   }
 
   const handleNext = () => {
-    const nextText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)]
-    setGame({
-      status: 'idle',
-      targetText: nextText,
-      currentIndex: 0,
-      errors: 0,
-      startTime: null,
-    })
+    setGame(createGameState(game.mode))
     setElapsedMs(0)
   }
 
   const elapsedSec = elapsedMs / 1000
-  const wpm = elapsedSec > 0 ? Math.round((game.currentIndex / 5) / (elapsedSec / 60)) : 0
-  const accuracy = game.currentIndex + game.errors > 0
-    ? Math.round((game.currentIndex / (game.currentIndex + game.errors)) * 100)
+  // For romaji mode, count typed romaji characters for WPM
+  const typedChars = game.mode === 'ja' && game.romajiState
+    ? game.romajiState.confirmedRomaji.length
+    : game.currentIndex
+  const wpm = elapsedSec > 0 ? Math.round((typedChars / 5) / (elapsedSec / 60)) : 0
+  const accuracy = typedChars + game.errors > 0
+    ? Math.round((typedChars / (typedChars + game.errors)) * 100)
     : 100
 
   return (
@@ -147,23 +227,56 @@ export function TypingGame({ keymap, onHighlightChange }: Props) {
       {/* お題テキスト */}
       <div
         key={shakeKey}
-        className={`bg-gray-800 rounded-lg p-6 font-mono text-2xl leading-relaxed tracking-wide select-none ${shakeKey > 0 ? 'animate-shake' : ''}`}
+        className={`bg-gray-800 rounded-lg p-6 font-mono select-none ${shakeKey > 0 ? 'animate-shake' : ''}`}
       >
-        {game.targetText.split('').map((char, i) => {
-          let className = 'text-gray-500'
-          if (i < game.currentIndex) {
-            className = 'text-green-400'
-          } else if (i === game.currentIndex) {
-            className = shakeKey > 0
-              ? 'text-red-400 underline underline-offset-4 decoration-red-400'
-              : 'text-white underline underline-offset-4 decoration-blue-400'
-          }
-          return (
-            <span key={i} className={className}>
-              {char}
-            </span>
-          )
-        })}
+        {game.mode === 'en' ? (
+          // English mode: character-by-character display
+          <div className="text-2xl leading-relaxed tracking-wide">
+            {game.targetText.split('').map((char, i) => {
+              let className = 'text-gray-500'
+              if (i < game.currentIndex) {
+                className = 'text-green-400'
+              } else if (i === game.currentIndex) {
+                className = shakeKey > 0
+                  ? 'text-red-400 underline underline-offset-4 decoration-red-400'
+                  : 'text-white underline underline-offset-4 decoration-blue-400'
+              }
+              return (
+                <span key={i} className={className}>
+                  {char}
+                </span>
+              )
+            })}
+          </div>
+        ) : game.romajiState ? (
+          // Romaji mode: two-line display (kana + romaji guide)
+          <div className="space-y-3">
+            {/* Kana line */}
+            <div className="text-2xl leading-relaxed tracking-wide">
+              {game.romajiState.chunks.map((chunk, i) => {
+                let className = 'text-gray-500'
+                if (i < game.romajiState!.currentChunkIndex) {
+                  className = 'text-green-400'
+                } else if (i === game.romajiState!.currentChunkIndex) {
+                  className = shakeKey > 0
+                    ? 'text-red-400 underline underline-offset-4 decoration-red-400'
+                    : 'text-white underline underline-offset-4 decoration-blue-400'
+                }
+                return (
+                  <span key={i} className={className}>
+                    {chunk.kana}
+                  </span>
+                )
+              })}
+            </div>
+            {/* Romaji guide line */}
+            <div className="text-lg">
+              <span className="text-green-400">{game.romajiState.confirmedRomaji}</span>
+              <span className="text-white">{game.romajiState.currentInput}</span>
+              <span className="text-gray-600">{getRemainingRomaji(game.romajiState)}</span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ステータス */}
