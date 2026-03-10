@@ -26,6 +26,9 @@ class MidiPico
       @active_chord_action = nil
       @active_chord_notes = []
       @tick = 0
+
+      # HID release が失敗した場合のリトライフラグ
+      @release_pending = false
     end
 
     def run
@@ -45,8 +48,15 @@ class MidiPico
           @pending.clear
         end
 
+        # HID release が前回失敗していたらリトライ
+        if @release_pending
+          retry_release
+        end
+
         @tick += 1
-        Machine.delay_ms 1
+        # sleep はスケジューラに制御を返す。Machine.delay_ms はCPUブロッキングのため
+        # 他タスク (MSC 等) を飢餓させるので使わない。
+        sleep 0.001
       end
     end
 
@@ -95,10 +105,18 @@ class MidiPico
     def handle_note_off(note)
       print "NOTE_OFF #{Note.name_for(note)}\r\n"
 
-      # pending にあるノートが離された場合は除去するだけ
-      # (和音判定中の超短タップ — 実用上はほぼ起きない)
-      if remove_from_pending(note)
-        # removed from pending, nothing else to do
+      pending_entry = remove_from_pending(note)
+      if pending_entry
+        # 和音判定中に NOTE_OFF が来た場合、単体ノートとして即発火＋即リリース。
+        # MIDI キーボードは短いタップで 50ms 未満の NOTE_ON→OFF を送るため、
+        # 待たずに処理しないとキー入力がロストする。
+        action = find_action(@singles[note], pending_entry[1])
+        if action.is_a?(Action::LayerChange)
+          apply_layer_change(action, [note])
+        elsif action
+          press_action(action)
+          release_action(action)
+        end
       elsif @hold_returns[note]
         switch_layer(@hold_returns.delete(note))
       elsif @active_chord_notes.include?(note)
@@ -137,12 +155,21 @@ class MidiPico
       end
 
       unless action.is_a?(Action::MidiNote)
-        if @modifier_state > 0
-          HidKeyboard.press(0, @modifier_state)
-        else
-          HidKeyboard.release_all
-        end
+        send_hid_release
       end
+    end
+
+    def send_hid_release
+      result = if @modifier_state > 0
+        HidKeyboard.press(0, @modifier_state)
+      else
+        HidKeyboard.release_all
+      end
+      @release_pending = !result
+    end
+
+    def retry_release
+      send_hid_release
     end
 
     def apply_layer_change(action, notes)
@@ -298,17 +325,16 @@ class MidiPico
       false
     end
 
-    # @pending から指定ノートを除去。除去できたら true を返す
+    # @pending から指定ノートを除去。除去できたら [note, velocity] を返す
     def remove_from_pending(note)
       i = 0
       while i < @pending.size
         if @pending[i][0] == note
-          @pending.delete_at(i)
-          return true
+          return @pending.delete_at(i)
         end
         i += 1
       end
-      false
+      nil
     end
 
     # 挿入ソート (mruby/c に Array#sort がないため)
