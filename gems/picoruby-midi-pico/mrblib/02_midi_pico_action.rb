@@ -24,5 +24,14 @@ class MidiPico
         @mode = mode  # :hold or :switch
       end
     end
+
+    class MidiNote
+      attr_reader :note, :channel
+
+      def initialize(note, channel: 0)
+        @note = note
+        @channel = channel
+      end
+    end
   end
 end

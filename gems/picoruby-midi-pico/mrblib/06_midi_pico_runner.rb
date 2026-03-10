@@ -55,6 +55,9 @@ class MidiPico
     def handle_note_on(note, velocity)
       print "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}\r\n"
 
+      # MidiNote アクションがベロシティをパススルーするために記録
+      @last_velocity = velocity
+
       if @chord_note_set[note]
         @pending << [note, velocity]
         @pending_start = @tick if @pending.size == 1
@@ -115,7 +118,10 @@ class MidiPico
     end
 
     def press_action(action)
-      if action.is_a?(Action::Modifier)
+      if action.is_a?(Action::MidiNote)
+        @last_velocity ||= 127
+        MidiOutput.note_on(action.channel, action.note, @last_velocity)
+      elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state | action.modifier
         HidKeyboard.press(0, @modifier_state)
       elsif action.is_a?(Action::Keycode)
@@ -124,13 +130,18 @@ class MidiPico
     end
 
     def release_action(action)
-      if action.is_a?(Action::Modifier)
+      if action.is_a?(Action::MidiNote)
+        MidiOutput.note_off(action.channel, action.note, 0)
+      elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state & ~action.modifier
       end
-      if @modifier_state > 0
-        HidKeyboard.press(0, @modifier_state)
-      else
-        HidKeyboard.release_all
+
+      unless action.is_a?(Action::MidiNote)
+        if @modifier_state > 0
+          HidKeyboard.press(0, @modifier_state)
+        else
+          HidKeyboard.release_all
+        end
       end
     end
 
