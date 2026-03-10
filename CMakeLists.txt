@@ -61,6 +61,7 @@ file(GLOB PORT_FILES CONFIGURE_DEPENDS
   ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/ports/rp2040/*.c
   ${CMAKE_SOURCE_DIR}/gems/picoruby-pio-usb-midi/ports/rp2040/*.c
   ${CMAKE_SOURCE_DIR}/gems/picoruby-hid-keyboard/ports/rp2040/*.c
+  ${CMAKE_SOURCE_DIR}/gems/picoruby-midi-output/ports/rp2040/*.c
 )
 # msc_disk.c は PICORUBY_MSC_FLASH か PICORUBY_MSC_SD が必要。
 # このプロジェクトでは MSC 不要なので除外する (PICORUBY_NO_MSC で中身も空になる)。
@@ -113,6 +114,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/lib/ff14b/source # FatFs ライブラリ
   ${CMAKE_SOURCE_DIR}/gems/picoruby-pio-usb-midi/include
   ${CMAKE_SOURCE_DIR}/gems/picoruby-hid-keyboard/include
+  ${CMAKE_SOURCE_DIR}/gems/picoruby-midi-output/include
 )
 
 # Stage 1 で生成した libmruby.a の場所
