@@ -1,8 +1,9 @@
 /*
- * TinyUSB device descriptors: CDC (serial console) + HID (keyboard).
+ * TinyUSB device descriptors: CDC (serial console) + HID (keyboard) + MIDI.
  *
  * CDC provides hal_write/hal_getchar console I/O for picoruby-machine.
  * HID Keyboard sends keystrokes to the host PC.
+ * MIDI streams note data to the host PC as a USB MIDI device.
  */
 
 #include "tusb.h"
@@ -11,6 +12,8 @@ enum {
   ITF_NUM_CDC = 0,
   ITF_NUM_CDC_DATA,
   ITF_NUM_HID,
+  ITF_NUM_MIDI,
+  ITF_NUM_MIDI_STREAMING,
   ITF_NUM_TOTAL
 };
 
@@ -44,13 +47,15 @@ static uint8_t const desc_hid_report[] = {
   TUD_HID_REPORT_DESC_KEYBOARD()
 };
 
-/* Configuration Descriptor: CDC + HID */
-#define CONFIG_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_HID_DESC_LEN)
+/* Configuration Descriptor: CDC + HID + MIDI */
+#define CONFIG_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_HID_DESC_LEN + TUD_MIDI_DESC_LEN)
 
 #define EPNUM_CDC_NOTIF   0x81
 #define EPNUM_CDC_OUT     0x02
 #define EPNUM_CDC_IN      0x82
 #define EPNUM_HID_IN      0x83
+#define EPNUM_MIDI_OUT    0x04
+#define EPNUM_MIDI_IN     0x84
 
 static uint8_t const desc_configuration[] = {
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
@@ -58,6 +63,7 @@ static uint8_t const desc_configuration[] = {
   TUD_HID_DESCRIPTOR(ITF_NUM_HID, 5, HID_ITF_PROTOCOL_KEYBOARD,
                      sizeof(desc_hid_report), EPNUM_HID_IN,
                      CFG_TUD_HID_EP_BUFSIZE, 10),
+  TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 6, EPNUM_MIDI_OUT, EPNUM_MIDI_IN, 64),
 };
 
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
@@ -73,6 +79,7 @@ static char const *string_desc_arr[] = {
   "000001",                     /* Serial */
   "midipico CDC",               /* CDC Interface */
   "midipico Keyboard",          /* HID Keyboard Interface */
+  "midipico MIDI",              /* MIDI Interface */
 };
 
 static uint16_t _desc_str[32];
