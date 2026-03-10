@@ -74,6 +74,23 @@ mp.add_layer :default, {
 
   [D4, E4] => KC_ESC,
   [B3, C4] => KC_SPC,
+
+  # C3+Cs3+D3 同時押しでパススルーレイヤーに切り替え
+  [C3, Cs3, D3] => MidiPico::Action::LayerChange.new(:passthrough, :switch),
 }
+
+# パススルーレイヤー: 全ノートを MIDI としてそのまま出力する
+passthrough_mapping = {}
+# C2 (36) ~ B6 (95) の全ノートをパススルー
+note_number = 36
+while note_number <= 95
+  n = MidiPico::Note.new(note_number)
+  passthrough_mapping[n] = n
+  note_number += 1
+end
+# C3+Cs3+D3 同時押しで default レイヤーに戻る
+passthrough_mapping[[C3, Cs3, D3]] = MidiPico::Action::LayerChange.new(:default, :switch)
+
+mp.add_layer :passthrough, passthrough_mapping
 
 mp.start!
