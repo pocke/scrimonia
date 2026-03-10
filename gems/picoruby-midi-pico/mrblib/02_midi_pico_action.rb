@@ -26,11 +26,10 @@ class MidiPico
     end
 
     class MidiNote
-      attr_reader :note, :channel
+      attr_reader :note
 
-      def initialize(note, channel: 0)
+      def initialize(note)
         @note = note
-        @channel = channel
       end
     end
   end

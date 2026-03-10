@@ -1,24 +1,22 @@
 #include <mrubyc.h>
 
-/* MidiOutput.note_on(channel, note, velocity) */
+/* MidiOutput.note_on(note, velocity) */
 static void
 c_note_on(mrbc_vm *vm, mrbc_value *v, int argc)
 {
-  uint8_t channel  = (uint8_t)GET_INT_ARG(1);
-  uint8_t note     = (uint8_t)GET_INT_ARG(2);
-  uint8_t velocity = (uint8_t)GET_INT_ARG(3);
-  bool ok = midi_output_note_on(channel, note, velocity);
+  uint8_t note     = (uint8_t)GET_INT_ARG(1);
+  uint8_t velocity = (uint8_t)GET_INT_ARG(2);
+  bool ok = midi_output_note_on(note, velocity);
   SET_BOOL_RETURN(ok);
 }
 
-/* MidiOutput.note_off(channel, note, velocity = 0) */
+/* MidiOutput.note_off(note, velocity = 0) */
 static void
 c_note_off(mrbc_vm *vm, mrbc_value *v, int argc)
 {
-  uint8_t channel  = (uint8_t)GET_INT_ARG(1);
-  uint8_t note     = (uint8_t)GET_INT_ARG(2);
-  uint8_t velocity = (argc >= 3) ? (uint8_t)GET_INT_ARG(3) : 0;
-  bool ok = midi_output_note_off(channel, note, velocity);
+  uint8_t note     = (uint8_t)GET_INT_ARG(1);
+  uint8_t velocity = (argc >= 2) ? (uint8_t)GET_INT_ARG(2) : 0;
+  bool ok = midi_output_note_off(note, velocity);
   SET_BOOL_RETURN(ok);
 }
 

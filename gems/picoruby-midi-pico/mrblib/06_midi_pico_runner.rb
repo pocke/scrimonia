@@ -120,7 +120,7 @@ class MidiPico
     def press_action(action)
       if action.is_a?(Action::MidiNote)
         @last_velocity ||= 127
-        MidiOutput.note_on(action.channel, action.note, @last_velocity)
+        MidiOutput.note_on(action.note, @last_velocity)
       elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state | action.modifier
         HidKeyboard.press(0, @modifier_state)
@@ -131,7 +131,7 @@ class MidiPico
 
     def release_action(action)
       if action.is_a?(Action::MidiNote)
-        MidiOutput.note_off(action.channel, action.note, 0)
+        MidiOutput.note_off(action.note)
       elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state & ~action.modifier
       end
