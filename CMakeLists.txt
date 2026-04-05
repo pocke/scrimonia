@@ -23,12 +23,9 @@ set(PICO_TINYUSB_PATH ${PICORUBY_ROOT}/mrbgems/picoruby-r2p2/lib/pico-sdk/lib/ti
 
 # PICORB_VM_MRUBYC: picoruby.h が mruby/c VM 用のヘッダ・API を選択するために必要。
 #                    未定義だと mruby VM 側が選ばれてしまう。
-# PICORUBY_MSC_FLASH: USB MSC で内蔵フラッシュの FAT パーティションを公開する。
 # PIO_USB_USE_TINYUSB: Pico-PIO-USB を TinyUSB 経由で使う (独自 API ではなく TinyUSB の Host API を利用)。
 add_compile_definitions(
   PICORB_VM_MRUBYC=1
-  PICORUBY_MSC_FLASH=1
-  USE_FAT_FLASH_DISK=1
   PIO_USB_USE_TINYUSB=1
 )
 
@@ -59,25 +56,21 @@ file(GLOB PORT_FILES CONFIGURE_DEPENDS
   ${PICORUBY_ROOT}/mrbgems/picoruby-machine/ports/common/*.c
   ${PICORUBY_ROOT}/mrbgems/picoruby-io-console/ports/rp2040/*.c
   ${PICORUBY_ROOT}/mrbgems/picoruby-env/ports/rp2040/*.c
-  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-littlefs/ports/rp2040/*.c
+  ${PICORUBY_ROOT}/mrbgems/picoruby-require/ports/rp2040/*.c
   ${CMAKE_SOURCE_DIR}/gems/picoruby-pio-usb-midi/ports/rp2040/*.c
   ${CMAKE_SOURCE_DIR}/gems/picoruby-hid-keyboard/ports/rp2040/*.c
   ${CMAKE_SOURCE_DIR}/gems/picoruby-midi-output/ports/rp2040/*.c
 )
-# サブモジュール版のディスクドライバはローカル版で置き換える:
-# - flash_disk.c: multicore lockout 対応版
-# - msc_disk.c: bsp/board.h 依存を除去した版
-# - sd_disk.c: SD カード用（不要）
-list(FILTER PORT_FILES EXCLUDE REGEX "sd_disk\\.c$")
-list(FILTER PORT_FILES EXCLUDE REGEX "flash_disk\\.c$")
-list(FILTER PORT_FILES EXCLUDE REGEX "msc_disk\\.c$")
+# 上流の flash_hal.c は multicore lockout が無いため、ローカル版で置き換える。
+# Core1 が PIO USB Host を XIP 経由で実行中にフラッシュ操作するとハングするため必須。
+list(FILTER PORT_FILES EXCLUDE REGEX "flash_hal\\.c$")
 
 add_executable(${PROJECT_NAME}
   ${SRCS}
   ${PORT_FILES}
-  # ローカル版ディスクドライバ (サブモジュール版を置き換え)
-  ${CMAKE_SOURCE_DIR}/src/ports/flash_disk.c
-  ${CMAKE_SOURCE_DIR}/src/ports/msc_disk.c
+  # multicore lockout 対応版 LittleFS フラッシュ HAL (上流版を置き換え)
+  ${CMAKE_SOURCE_DIR}/src/ports/lfs_flash_hal.c
   # TinyUSB の PIO USB Host/Device コントローラドライバ
   ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c
   ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c
@@ -119,8 +112,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${PICORUBY_ROOT}/mrbgems/mruby-compiler2/lib/prism/include       # Prism パーサ (コンパイラ依存)
   ${PICORUBY_ROOT}/mrbgems/picoruby-mrubyc/lib/mrubyc/src          # mruby/c VM のヘッダ
   ${PICORUBY_ROOT}/mrbgems/picoruby-machine/include                # hal.h (HAL 抽象層)
-  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/lib/ff14b/source # FatFs ライブラリ
-  ${PICORUBY_ROOT}/mrbgems/picoruby-filesystem-fat/include         # fat.h
+  ${PICORUBY_ROOT}/mrbgems/picoruby-littlefs/include                # littlefs.h
+  ${PICORUBY_ROOT}/mrbgems/picoruby-littlefs/lib/littlefs          # lfs.h
+  ${PICORUBY_ROOT}/mrbgems/picoruby-require/include                # platform.h
   ${CMAKE_SOURCE_DIR}/gems/picoruby-pio-usb-midi/include
   ${CMAKE_SOURCE_DIR}/gems/picoruby-hid-keyboard/include
   ${CMAKE_SOURCE_DIR}/gems/picoruby-midi-output/include
