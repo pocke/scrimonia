@@ -34,6 +34,13 @@ void core1_main(void)
 {
   sleep_ms(10);
 
+  /*
+   * Core0 からのフラッシュ書き込み時に XIP アクセス競合を防ぐ。
+   * multicore_lockout_start_blocking() が呼ばれると、このコアは
+   * RAM 上のスピンループに入り、フラッシュ操作完了まで待機する。
+   */
+  multicore_lockout_victim_init();
+
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
