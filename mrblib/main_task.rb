@@ -1,20 +1,20 @@
-require 'filesystem-fat'
+require 'littlefs'
 require 'vfs'
 require 'sandbox'
 require 'midi_pico'
 
 KEYMAP_PATH = "/keymap.rb"
 
-# FAT ファイルシステムをフラッシュ上にマウント
-fat = FAT.new(:flash, label: "MidiPico")
+# LittleFS ファイルシステムをフラッシュ上にマウント
+lfs = Littlefs.new(:flash)
 begin
-  VFS.mount(fat, "/")
-  print "FAT mounted\r\n"
+  VFS.mount(lfs, "/")
+  print "LittleFS mounted\r\n"
 rescue => e
-  print "FAT mount failed, formatting...\r\n"
-  fat.mkfs
-  VFS.mount(fat, "/")
-  print "FAT formatted and mounted\r\n"
+  print "LittleFS mount failed, formatting...\r\n"
+  lfs.mkfs
+  VFS.mount(lfs, "/")
+  print "LittleFS formatted and mounted\r\n"
 end
 
 if VFS.exist?(KEYMAP_PATH)
@@ -25,7 +25,6 @@ if VFS.exist?(KEYMAP_PATH)
   sandbox.load_file(KEYMAP_PATH, join: false)
 else
   print "No #{KEYMAP_PATH} found.\r\n"
-  print "Drop keymap.rb onto the MidiPico USB drive.\r\n"
 end
 
 # keymap.rb が Sandbox タスクとして動いている間、main_task は idle で待機。
