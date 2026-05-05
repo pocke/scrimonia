@@ -1,0 +1,21 @@
+name: Steep
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  steep:
+    runs-on: ubuntu-latest
+    steps:
+      # picoruby_library が build_config から依存 gem を解決し、各 gem の
+      # sig/ を読み込むため、サブモジュールが必要。
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+      - run: bundle exec steep check
