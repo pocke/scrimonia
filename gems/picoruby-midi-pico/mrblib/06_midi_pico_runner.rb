@@ -205,14 +205,11 @@ class MidiPico
     #   mruby/c Hash はオブジェクトキーをポインタ比較するため、
     #   Array をキーにできない。線形探索用の配列として保持する。
     def build_layer(mapping)
-      # @type var singles: singles_table
-      singles = {}
-      # @type var chords: Array[chord_entry]
-      chords = []
+      singles = {} #: singles_table
+      chords = [] #: Array[chord_entry]
       mapping.each do |key, value|
         if key.is_a?(Array)
-          # @type var pairs: Array[chord_pair]
-          pairs = []
+          pairs = [] #: Array[chord_pair]
           key.each do |k|
             if k.is_a?(Note)
               pairs << [k.number, k.velocity]
@@ -235,8 +232,7 @@ class MidiPico
       end
 
       # 和音に含まれるノートを高速判定するための集合
-      # @type var chord_note_set: Hash[Integer, true]
-      chord_note_set = {}
+      chord_note_set = {} #: Hash[Integer, true]
       chords.each do |entry|
         entry[0].each do |pair|
           chord_note_set[pair[0]] = true
@@ -262,8 +258,7 @@ class MidiPico
 
     # @pending のノート番号をソート済み配列として返す
     def pending_sorted_notes
-      # @type var notes: Array[Integer]
-      notes = []
+      notes = [] #: Array[Integer]
       @pending.each do |p|
         notes << p[0]
       end
@@ -351,8 +346,7 @@ class MidiPico
     #   insertion_sort(notes) { |x| x }
     # ソートキーを事前計算して yield 呼び出しを O(n) に抑える。
     def insertion_sort(arr)
-      # @type var keys: Array[Integer | String]
-      keys = []
+      keys = [] #: Array[Integer | String]
       i = 0
       while i < arr.size
         keys << yield(arr[i])

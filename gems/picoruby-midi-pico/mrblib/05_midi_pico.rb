@@ -21,8 +21,7 @@ class MidiPico
   # Note をアクション値として使った場合に Action::MidiNote に変換する。
   # `C2 => C2` のような記述で MIDI パススルーを実現する。
   def normalize_mapping(mapping)
-    # @type var normalized: Hash[layer_key, layer_value]
-    normalized = {}
+    normalized = {} #: Hash[layer_key, layer_value]
     mapping.each do |key, value|
       if value.is_a?(Note)
         normalized[key] = Action::MidiNote.new(value.number)
