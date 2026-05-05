@@ -22,11 +22,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi
 
-      # `rake libmruby` ステージが lib/picoruby 内で `bundle exec rake` を
-      # 実行するため、Ruby 環境と picoruby 側の bundle install が必要。
+      # `bundler-cache: true` でルートの Gemfile を bundle install する。
+      # `bundle exec rake all` のために必要。lib/picoruby は別 Gemfile を
+      # 持つため、別途 bundle install を走らせる。
       - uses: ruby/setup-ruby@c4e5b1316158f92e3d49443a9d58b31d25ac0f8f # v1.306.0
         with:
           ruby-version: '4.0'
+          bundler-cache: true
 
       - name: Install picoruby gems
         run: bundle install
