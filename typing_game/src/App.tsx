@@ -90,7 +90,7 @@ function App() {
               </div>
             </div>
             <PianoKeyboard keymap={defaultLayer} highlightNotes={highlightNotes} />
-            <TypingGame keymap={defaultLayer} onHighlightChange={setHighlightNotes} mode={gameMode} romajiPreferences={romajiPreferences} />
+            <TypingGame key={gameMode} keymap={defaultLayer} onHighlightChange={setHighlightNotes} mode={gameMode} romajiPreferences={romajiPreferences} />
           </>
         )}
       </main>
