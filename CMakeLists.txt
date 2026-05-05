@@ -87,18 +87,19 @@ add_custom_target(mrbdir ALL
   COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/mrb
 )
 
-set(RUBY_TASK_FILES main_task)
-foreach(rb ${RUBY_TASK_FILES})
-  add_custom_target(${rb}
-    COMMAND ${PICORBC} -B${rb}
-      -o${CMAKE_BINARY_DIR}/mrb/${rb}.c
-      ${CMAKE_SOURCE_DIR}/mrblib/${rb}.rb
-  )
-endforeach(rb)
+# main_task のバイトコード化。複数の .rb を picorbc に渡すと、それらが
+# 順番に1つの symbol (main_task[]) に連結される。サブモジュール定義を
+# main_task.rb より前に並べることで、メイン処理から参照可能になる。
+add_custom_target(main_task
+  COMMAND ${PICORBC} -Bmain_task
+    -o${CMAKE_BINARY_DIR}/mrb/main_task.c
+    ${CMAKE_SOURCE_DIR}/mrblib/serial_keymap_receiver.rb
+    ${CMAKE_SOURCE_DIR}/mrblib/main_task.rb
+)
 
 add_dependencies(${PROJECT_NAME}
   mrbdir
-  ${RUBY_TASK_FILES}
+  main_task
 )
 
 # --- インクルードパス ---
