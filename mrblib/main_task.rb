@@ -38,9 +38,8 @@ loop do
     print "Keymap uploaded. Restarting...\r\n"
     # TODO: 既存の Sandbox タスクを停止する方法が確立したら置き換える。
     # 現状は Sandbox を新規作成してキーマップをロードする。
-    new_sandbox = Sandbox.new
-    new_sandbox.load_file(KEYMAP_PATH, join: false)
-    sandbox = new_sandbox
+    sandbox = Sandbox.new or raise
+    sandbox.load_file(KEYMAP_PATH, join: false)
     print "Keymap reloaded.\r\n"
   end
   sleep_ms 100
