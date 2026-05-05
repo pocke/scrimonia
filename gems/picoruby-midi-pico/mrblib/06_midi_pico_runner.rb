@@ -117,8 +117,8 @@ class MidiPico
           press_action(action)
           release_action(action)
         end
-      elsif @hold_returns[note]
-        switch_layer(@hold_returns.delete(note))
+      elsif (return_layer = @hold_returns.delete(note))
+        switch_layer(return_layer)
       elsif @active_chord_notes.include?(note)
         release_action(@active_chord_action)
         @active_chord_action = nil
@@ -137,8 +137,9 @@ class MidiPico
 
     def press_action(action)
       if action.is_a?(Action::MidiNote)
-        @last_velocity ||= 127
-        MidiOutput.note_on(action.note, @last_velocity)
+        velocity = @last_velocity || 127
+        @last_velocity = velocity
+        MidiOutput.note_on(action.note, velocity)
       elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state | action.modifier
         HidKeyboard.press(0, @modifier_state)
@@ -202,10 +203,13 @@ class MidiPico
     #   mruby/c Hash はオブジェクトキーをポインタ比較するため、
     #   Array をキーにできない。線形探索用の配列として保持する。
     def build_layer(mapping)
+      # @type var singles: singles_table
       singles = {}
+      # @type var chords: Array[chord_entry]
       chords = []
       mapping.each do |key, value|
         if key.is_a?(Array)
+          # @type var pairs: Array[chord_pair]
           pairs = []
           key.each do |k|
             if k.is_a?(Note)
@@ -229,6 +233,7 @@ class MidiPico
       end
 
       # 和音に含まれるノートを高速判定するための集合
+      # @type var chord_note_set: Hash[Integer, true]
       chord_note_set = {}
       chords.each do |entry|
         entry[0].each do |pair|
@@ -255,6 +260,7 @@ class MidiPico
 
     # @pending のノート番号をソート済み配列として返す
     def pending_sorted_notes
+      # @type var notes: Array[Integer]
       notes = []
       @pending.each do |p|
         notes << p[0]
@@ -343,6 +349,7 @@ class MidiPico
     #   insertion_sort(notes) { |x| x }
     # ソートキーを事前計算して yield 呼び出しを O(n) に抑える。
     def insertion_sort(arr)
+      # @type var keys: Array[Integer | String]
       keys = []
       i = 0
       while i < arr.size

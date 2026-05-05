@@ -10,8 +10,9 @@ class MidiPico
   # 名前付きレイヤーを登録する。実行時に :default レイヤーが必須。
   def add_layer: (Symbol name, layer_mapping mapping) -> void
 
-  # MIDI イベントループを開始する。戻らない。
-  def start!: () -> bot
+  # MIDI イベントループを開始する。実装は無限ループだが、Steep からは
+  # void として扱う (`Kernel#loop` の戻り値が nil 推論されるため)。
+  def start!: () -> void
 
   private
 

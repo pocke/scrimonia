@@ -1,0 +1,59 @@
+class MidiPico
+  # MIDI イベントループとキーマップ実行を担う内部クラス。
+  # `MidiPico#start!` から `Runner.new(layer_definitions).run` で起動される。
+  #
+  # 内部のデータ構造 (singles / chords / chord_note_set) は untyped で扱う。
+  # mruby/c の制約 (Hash の Array キー比較がポインタ一致) と複雑な
+  # 入れ子構造のため、型を厳密に書くと表現力を超え、型注釈の負担も大きい。
+  class Runner
+    type singles_table = Hash[Integer, Array[[(Integer | Range[Integer])?, layer_value]]]
+    type chord_pair = [Integer, (Integer | Range[Integer])?]
+    type chord_entry = [Array[chord_pair], layer_value]
+    type chord_note_set = Hash[Integer, true]
+    type layer_data = [singles_table, Array[chord_entry], chord_note_set]
+
+    CHORD_TIMEOUT_MS: Integer
+
+    @layers: Hash[Symbol, layer_data]
+    @active_layer_name: Symbol
+    @singles: singles_table
+    @chords: Array[chord_entry]
+    @chord_note_set: chord_note_set
+    @pressed: Hash[Integer, layer_value]
+    @modifier_state: Integer
+    @hold_returns: Hash[Integer, Symbol]
+    @pending: Array[[Integer, Integer]]
+    @pending_start: Integer
+    @active_chord_action: layer_value?
+    @active_chord_notes: Array[Integer]
+    @tick: Integer
+    @release_pending: bool
+    @last_velocity: Integer?
+
+    def initialize: (Array[[Symbol, Hash[layer_key, layer_value]]] layer_definitions) -> void
+
+    # MIDI イベントを受信して処理する無限ループ。
+    def run: () -> void
+
+    private
+
+    def handle_note_on: (Integer note, Integer velocity) -> void
+    def handle_note_off: (Integer note) -> void
+    def switch_layer: (Symbol layer_name) -> void
+    def press_action: (layer_value? action) -> void
+    def release_action: (layer_value? action) -> void
+    def send_hid_release: () -> void
+    def retry_release: () -> void
+    def apply_layer_change: (Action::LayerChange action, Array[Integer] notes) -> void
+    def flush_pending: () -> void
+    def build_layer: (Hash[layer_key, layer_value] mapping) -> layer_data
+    def find_action: (Array[[(Integer | Range[Integer])?, layer_value]]? entries, Integer velocity) -> layer_value?
+    def pending_sorted_notes: () -> Array[Integer]
+    def find_chord: (Array[Integer] sorted_notes) -> layer_value?
+    def prefix_of_any_chord?: (Array[Integer] sorted_notes) -> bool
+    def remove_from_pending: (Integer note) -> [Integer, Integer]?
+
+    # 挿入ソート (mruby/c に Array#sort がないため)。yield でソートキーを抽出する。
+    def insertion_sort: [T] (Array[T] arr) { (T) -> (Integer | String) } -> Array[T]
+  end
+end
