@@ -1,0 +1,96 @@
+class MidiPico
+  module Keycodes
+    # アルファベット
+    KC_A: Action::Keycode
+    KC_B: Action::Keycode
+    KC_C: Action::Keycode
+    KC_D: Action::Keycode
+    KC_E: Action::Keycode
+    KC_F: Action::Keycode
+    KC_G: Action::Keycode
+    KC_H: Action::Keycode
+    KC_I: Action::Keycode
+    KC_J: Action::Keycode
+    KC_K: Action::Keycode
+    KC_L: Action::Keycode
+    KC_M: Action::Keycode
+    KC_N: Action::Keycode
+    KC_O: Action::Keycode
+    KC_P: Action::Keycode
+    KC_Q: Action::Keycode
+    KC_R: Action::Keycode
+    KC_S: Action::Keycode
+    KC_T: Action::Keycode
+    KC_U: Action::Keycode
+    KC_V: Action::Keycode
+    KC_W: Action::Keycode
+    KC_X: Action::Keycode
+    KC_Y: Action::Keycode
+    KC_Z: Action::Keycode
+
+    # 数字
+    KC_0: Action::Keycode
+    KC_1: Action::Keycode
+    KC_2: Action::Keycode
+    KC_3: Action::Keycode
+    KC_4: Action::Keycode
+    KC_5: Action::Keycode
+    KC_6: Action::Keycode
+    KC_7: Action::Keycode
+    KC_8: Action::Keycode
+    KC_9: Action::Keycode
+
+    # 特殊キー
+    KC_ENTER: Action::Keycode
+    KC_ESC: Action::Keycode
+    KC_BSPC: Action::Keycode
+    KC_TAB: Action::Keycode
+    KC_SPC: Action::Keycode
+    KC_MINUS: Action::Keycode
+    KC_EQUAL: Action::Keycode
+    KC_LBRC: Action::Keycode
+    KC_RBRC: Action::Keycode
+    KC_BSLS: Action::Keycode
+    KC_SCLN: Action::Keycode
+    KC_QUOT: Action::Keycode
+    KC_GRV: Action::Keycode
+    KC_COMM: Action::Keycode
+    KC_DOT: Action::Keycode
+    KC_SLSH: Action::Keycode
+
+    # ファンクションキー
+    KC_F1: Action::Keycode
+    KC_F2: Action::Keycode
+    KC_F3: Action::Keycode
+    KC_F4: Action::Keycode
+    KC_F5: Action::Keycode
+    KC_F6: Action::Keycode
+    KC_F7: Action::Keycode
+    KC_F8: Action::Keycode
+    KC_F9: Action::Keycode
+    KC_F10: Action::Keycode
+    KC_F11: Action::Keycode
+    KC_F12: Action::Keycode
+
+    # 矢印・編集系
+    KC_RIGHT: Action::Keycode
+    KC_LEFT: Action::Keycode
+    KC_DOWN: Action::Keycode
+    KC_UP: Action::Keycode
+    KC_DEL: Action::Keycode
+    KC_HOME: Action::Keycode
+    KC_END: Action::Keycode
+    KC_PGUP: Action::Keycode
+    KC_PGDN: Action::Keycode
+
+    # 修飾キー (HID modifier ビットマスク)
+    KC_LCTL: Action::Modifier
+    KC_LSFT: Action::Modifier
+    KC_LALT: Action::Modifier
+    KC_LGUI: Action::Modifier
+    KC_RCTL: Action::Modifier
+    KC_RSFT: Action::Modifier
+    KC_RALT: Action::Modifier
+    KC_RGUI: Action::Modifier
+  end
+end

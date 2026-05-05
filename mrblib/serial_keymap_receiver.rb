@@ -84,7 +84,7 @@ class SerialKeymapReceiver
       end
 
       if line.start_with?("CHUNK ")
-        len = line[6..].to_i(16)
+        len = (line[6..] || raise).to_i(16)
         if len <= 0 || len > CHUNK_SIZE
           print "UPLOAD_ERROR invalid chunk size\r\n"
           return nil

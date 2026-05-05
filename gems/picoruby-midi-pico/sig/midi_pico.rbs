@@ -1,0 +1,64 @@
+class MidiPico
+  type layer_key = Note | Array[Note] | Integer
+  type layer_value = Action::Keycode | Action::Modifier | Action::LayerChange | Action::MidiNote | Note
+  type layer_mapping = Hash[layer_key, layer_value]
+
+  @layer_definitions: Array[[Symbol, Hash[layer_key, layer_value]]]
+
+  def initialize: () -> void
+
+  # 名前付きレイヤーを登録する。実行時に :default レイヤーが必須。
+  def add_layer: (Symbol name, layer_mapping mapping) -> void
+
+  # MIDI イベントループを開始する。実装は無限ループだが、Steep からは
+  # void として扱う (`Kernel#loop` の戻り値が nil 推論されるため)。
+  def start!: () -> void
+
+  private
+
+  def normalize_mapping: (layer_mapping) -> Hash[layer_key, layer_value]
+
+  class Note
+    NOTE_NAMES: Array[String]
+
+    attr_reader number: Integer
+    # 単体ノートとして使うとき: nil。
+    # キーマップ定義のキーとして使うとき: Range などの === マッチで判定可能な値。
+    attr_reader velocity: (Integer | Range[Integer])?
+
+    def initialize: (Integer number, ?velocity: (Integer | Range[Integer])?) -> void
+
+    # ベロシティ条件を付けた新しい Note を返す (元のオブジェクトは変えない)。
+    def with: (velocity: Integer | Range[Integer]) -> Note
+
+    # MIDI ノート番号を "C4" などの可読名に変換する。
+    def self.name_for: (Integer number) -> String
+  end
+
+  module Action
+    # HID キーコード (USB HID Usage ID)
+    class Keycode
+      attr_reader keycode: Integer
+      def initialize: (Integer keycode) -> void
+    end
+
+    # HID 修飾キー (Ctrl/Shift/Alt/GUI のビットマスク)
+    class Modifier
+      attr_reader modifier: Integer
+      def initialize: (Integer modifier) -> void
+    end
+
+    # レイヤー切り替え。mode は :hold (押している間だけ) か :switch (トグル)。
+    class LayerChange
+      attr_reader layer_name: Symbol
+      attr_reader mode: Symbol
+      def initialize: (Symbol layer_name, Symbol mode) -> void
+    end
+
+    # MIDI 出力アクション (ノートを USB MIDI Device として送出する)。
+    class MidiNote
+      attr_reader note: Integer
+      def initialize: (Integer note) -> void
+    end
+  end
+end

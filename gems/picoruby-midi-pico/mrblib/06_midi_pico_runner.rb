@@ -29,6 +29,10 @@ class MidiPico
 
       # HID release が失敗した場合のリトライフラグ
       @release_pending = false
+
+      # MidiNote アクションのベロシティパススルー用。最初の NOTE_ON が
+      # 来るまではこの初期値が使われる (MIDI の最大ベロシティ)。
+      @last_velocity = 127
     end
 
     def run
@@ -117,8 +121,8 @@ class MidiPico
           press_action(action)
           release_action(action)
         end
-      elsif @hold_returns[note]
-        switch_layer(@hold_returns.delete(note))
+      elsif (return_layer = @hold_returns.delete(note))
+        switch_layer(return_layer)
       elsif @active_chord_notes.include?(note)
         release_action(@active_chord_action)
         @active_chord_action = nil
@@ -137,7 +141,6 @@ class MidiPico
 
     def press_action(action)
       if action.is_a?(Action::MidiNote)
-        @last_velocity ||= 127
         MidiOutput.note_on(action.note, @last_velocity)
       elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state | action.modifier
@@ -202,11 +205,11 @@ class MidiPico
     #   mruby/c Hash はオブジェクトキーをポインタ比較するため、
     #   Array をキーにできない。線形探索用の配列として保持する。
     def build_layer(mapping)
-      singles = {}
-      chords = []
+      singles = {} #: singles_table
+      chords = [] #: Array[chord_entry]
       mapping.each do |key, value|
         if key.is_a?(Array)
-          pairs = []
+          pairs = [] #: Array[chord_pair]
           key.each do |k|
             if k.is_a?(Note)
               pairs << [k.number, k.velocity]
@@ -229,7 +232,7 @@ class MidiPico
       end
 
       # 和音に含まれるノートを高速判定するための集合
-      chord_note_set = {}
+      chord_note_set = {} #: Hash[Integer, true]
       chords.each do |entry|
         entry[0].each do |pair|
           chord_note_set[pair[0]] = true
@@ -255,7 +258,7 @@ class MidiPico
 
     # @pending のノート番号をソート済み配列として返す
     def pending_sorted_notes
-      notes = []
+      notes = [] #: Array[Integer]
       @pending.each do |p|
         notes << p[0]
       end
@@ -343,7 +346,7 @@ class MidiPico
     #   insertion_sort(notes) { |x| x }
     # ソートキーを事前計算して yield 呼び出しを O(n) に抑える。
     def insertion_sort(arr)
-      keys = []
+      keys = [] #: Array[Integer | String]
       i = 0
       while i < arr.size
         keys << yield(arr[i])

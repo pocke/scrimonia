@@ -1,0 +1,7 @@
+class MidiOutput
+  # USB MIDI Device として NOTE_ON/NOTE_OFF メッセージを送出する。
+  # 戻り値は送出成功フラグ。
+  def self.note_on: (Integer note, Integer velocity) -> bool
+
+  def self.note_off: (Integer note, ?Integer velocity) -> bool
+end
