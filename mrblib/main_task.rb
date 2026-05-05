@@ -1,22 +1,23 @@
-require 'filesystem-fat'
+require 'littlefs'
 require 'vfs'
 require 'sandbox'
 require 'midi_pico'
 
 KEYMAP_PATH = "/keymap.rb"
 
-# FAT ファイルシステムをフラッシュ上にマウント
-fat = FAT.new(:flash, label: "MidiPico")
+# LittleFS ファイルシステムをフラッシュ上にマウント
+lfs = Littlefs.new(:flash)
 begin
-  VFS.mount(fat, "/")
-  print "FAT mounted\r\n"
+  VFS.mount(lfs, "/")
+  print "LittleFS mounted\r\n"
 rescue => e
-  print "FAT mount failed, formatting...\r\n"
-  fat.mkfs
-  VFS.mount(fat, "/")
-  print "FAT formatted and mounted\r\n"
+  print "LittleFS mount failed, formatting...\r\n"
+  lfs.mkfs
+  VFS.mount(lfs, "/")
+  print "LittleFS formatted and mounted\r\n"
 end
 
+sandbox = nil
 if VFS.exist?(KEYMAP_PATH)
   print "Loading #{KEYMAP_PATH}\r\n"
   sandbox = Sandbox.new
@@ -24,12 +25,22 @@ if VFS.exist?(KEYMAP_PATH)
   # join: true だと Sandbox#wait が STDIN を読もうとして問題になる。
   sandbox.load_file(KEYMAP_PATH, join: false)
 else
-  print "No #{KEYMAP_PATH} found.\r\n"
-  print "Drop keymap.rb onto the MidiPico USB drive.\r\n"
+  print "No #{KEYMAP_PATH} found. Waiting for upload via WebSerial.\r\n"
 end
 
-# keymap.rb が Sandbox タスクとして動いている間、main_task は idle で待機。
-# sleep はスケジューラに制御を返す (Machine.delay_ms はCPUをブロックするので使わない)。
+STDIN.raw!
+
+receiver = SerialKeymapReceiver.new(KEYMAP_PATH)
+
+# メインループ: キーマップ受信を監視し、受信完了時にリロードする。
 loop do
-  sleep 1
+  if receiver.poll
+    print "Keymap uploaded. Restarting...\r\n"
+    # TODO: 既存の Sandbox タスクを停止する方法が確立したら置き換える。
+    # 現状は Sandbox を新規作成してキーマップをロードする。
+    sandbox = Sandbox.new
+    sandbox.load_file(KEYMAP_PATH, join: false)
+    print "Keymap reloaded.\r\n"
+  end
+  sleep_ms 100
 end

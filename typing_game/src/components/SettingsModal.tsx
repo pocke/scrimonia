@@ -5,7 +5,7 @@ import { KeymapUploader } from './KeymapUploader'
 interface Props {
   preferences: RomajiPreferences
   onPreferencesChange: (prefs: RomajiPreferences) => void
-  onKeymapParsed: (data: KeymapData) => void
+  onKeymapParsed: (data: KeymapData, rawContent: string) => void
   onClose: () => void
 }
 

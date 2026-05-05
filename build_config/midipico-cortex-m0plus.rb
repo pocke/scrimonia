@@ -28,17 +28,15 @@ MRuby::CrossBuild.new("midipico-cortex-m0plus") do |conf|
   conf.cc.defines << "MRBC_TIMESLICE_TICK_COUNT=10"
   conf.cc.defines << "NO_CLOCK_GETTIME=1"
   conf.cc.defines << "MAX_SYMBOLS_COUNT=1000"
-  conf.cc.defines << "USE_FAT_FLASH_DISK=1"
 
-  # picoruby() must be called before gembox so that vm_mrubyc? returns true
+  # femtoruby() must be called before gembox so that vm_mrubyc? returns true
   conf.mrubyc_hal_arm
-  conf.picoruby(alloc_libc: false)
+  conf.femtoruby(alloc_libc: false)
 
   conf.gembox "minimum"
   conf.gem core: 'picoruby-require'
   conf.gem core: 'picoruby-machine'
   conf.gem core: 'picoruby-gpio'
-  conf.gem core: 'picoruby-filesystem-fat'
   conf.gem core: 'picoruby-vfs'
   conf.gem core: 'picoruby-sandbox'
   conf.gem gemdir: '../gems/picoruby-pio-usb-midi'

@@ -3,7 +3,7 @@ import type { KeymapData } from '../types'
 import { parseKeymap } from '../lib/keymapParser'
 
 interface Props {
-  onKeymapParsed: (data: KeymapData) => void
+  onKeymapParsed: (data: KeymapData, rawContent: string) => void
 }
 
 export function KeymapUploader({ onKeymapParsed }: Props) {
@@ -19,7 +19,7 @@ export function KeymapUploader({ onKeymapParsed }: Props) {
     try {
       const content = await file.text()
       const data = await parseKeymap(content)
-      onKeymapParsed(data)
+      onKeymapParsed(data, content)
       setStatus('idle')
     } catch (e) {
       setStatus('error')
