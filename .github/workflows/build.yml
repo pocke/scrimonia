@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pico-sdk と pico-extras は lib/picoruby のネストした submodule に
+      # 入っているため、recursive 指定が必須。
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+
+      # Cortex-M0+ 向けクロスコンパイラ。Ubuntu 24.04 (ubuntu-latest) の
+      # 公式 apt リポジトリに gcc-arm-none-eabi が含まれている。
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+
+      # `bundler-cache: true` でルートの Gemfile を bundle install する。
+      # `bundle exec rake all` のために必要。lib/picoruby は別 Gemfile を
+      # 持つため、別途 bundle install を走らせる。
+      - uses: ruby/setup-ruby@c4e5b1316158f92e3d49443a9d58b31d25ac0f8f # v1.306.0
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+
+      - name: Install picoruby gems
+        run: bundle install
+        working-directory: lib/picoruby
+
+      # `rake all` は libmruby → cmake → build の3ステージを順に実行し、
+      # build/midipico.uf2 を生成する。
+      - run: bundle exec rake all
