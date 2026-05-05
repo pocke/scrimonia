@@ -1,0 +1,17 @@
+class SerialKeymapReceiver
+  CHUNK_SIZE: Integer
+
+  @path: String
+
+  def initialize: (String path) -> void
+
+  # STDIN をノンブロッキングに確認し、UPLOAD_START を検出したら受信して
+  # @path に保存する。受信成功時 true、それ以外 false。
+  def poll: () -> bool
+
+  private
+
+  def read_line: (Integer timeout_ms) -> String?
+  def read_exact: (Integer len, Integer timeout_ms) -> String?
+  def receive_chunks: () -> String?
+end

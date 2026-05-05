@@ -84,7 +84,9 @@ class SerialKeymapReceiver
       end
 
       if line.start_with?("CHUNK ")
-        len = line[6..].to_i(16)
+        # line.start_with?("CHUNK ") が真なので line[6..] は必ず非 nil。
+        # Steep は推論できないため || "" でナローイングする。
+        len = (line[6..] || "").to_i(16)
         if len <= 0 || len > CHUNK_SIZE
           print "UPLOAD_ERROR invalid chunk size\r\n"
           return nil
