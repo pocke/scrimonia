@@ -2,9 +2,9 @@ class MidiPico
   # MIDI イベントループとキーマップ実行を担う内部クラス。
   # `MidiPico#start!` から `Runner.new(layer_definitions).run` で起動される。
   #
-  # 内部のデータ構造 (singles / chords / chord_note_set) は untyped で扱う。
-  # mruby/c の制約 (Hash の Array キー比較がポインタ一致) と複雑な
-  # 入れ子構造のため、型を厳密に書くと表現力を超え、型注釈の負担も大きい。
+  # 内部のデータ構造は深い入れ子の Hash/Array で表現される (mruby/c の
+  # Hash が Array キーをポインタ比較する制約への対応)。下記の型エイリアス
+  # で構造を明示し、build_layer の戻り値や ivar の宣言で再利用する。
   class Runner
     type singles_table = Hash[Integer, Array[[(Integer | Range[Integer])?, layer_value]]]
     type chord_pair = [Integer, (Integer | Range[Integer])?]
