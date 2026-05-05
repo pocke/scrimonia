@@ -29,6 +29,10 @@ class MidiPico
 
       # HID release が失敗した場合のリトライフラグ
       @release_pending = false
+
+      # MidiNote アクションのベロシティパススルー用。最初の NOTE_ON が
+      # 来るまではこの初期値が使われる (MIDI の最大ベロシティ)。
+      @last_velocity = 127
     end
 
     def run
@@ -137,9 +141,7 @@ class MidiPico
 
     def press_action(action)
       if action.is_a?(Action::MidiNote)
-        velocity = @last_velocity || 127
-        @last_velocity = velocity
-        MidiOutput.note_on(action.note, velocity)
+        MidiOutput.note_on(action.note, @last_velocity)
       elsif action.is_a?(Action::Modifier)
         @modifier_state = @modifier_state | action.modifier
         HidKeyboard.press(0, @modifier_state)

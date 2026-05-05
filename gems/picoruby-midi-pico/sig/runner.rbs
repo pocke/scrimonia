@@ -28,7 +28,7 @@ class MidiPico
     @active_chord_notes: Array[Integer]
     @tick: Integer
     @release_pending: bool
-    @last_velocity: Integer?
+    @last_velocity: Integer
 
     def initialize: (Array[[Symbol, Hash[layer_key, layer_value]]] layer_definitions) -> void
 
