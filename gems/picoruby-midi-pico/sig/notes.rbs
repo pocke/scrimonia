@@ -1,0 +1,68 @@
+class MidiPico
+  module Notes
+    C2: Note
+    Cs2: Note
+    D2: Note
+    Ds2: Note
+    E2: Note
+    F2: Note
+    Fs2: Note
+    G2: Note
+    Gs2: Note
+    A2: Note
+    As2: Note
+    B2: Note
+
+    C3: Note
+    Cs3: Note
+    D3: Note
+    Ds3: Note
+    E3: Note
+    F3: Note
+    Fs3: Note
+    G3: Note
+    Gs3: Note
+    A3: Note
+    As3: Note
+    B3: Note
+
+    C4: Note
+    Cs4: Note
+    D4: Note
+    Ds4: Note
+    E4: Note
+    F4: Note
+    Fs4: Note
+    G4: Note
+    Gs4: Note
+    A4: Note
+    As4: Note
+    B4: Note
+
+    C5: Note
+    Cs5: Note
+    D5: Note
+    Ds5: Note
+    E5: Note
+    F5: Note
+    Fs5: Note
+    G5: Note
+    Gs5: Note
+    A5: Note
+    As5: Note
+    B5: Note
+
+    C6: Note
+    Cs6: Note
+    D6: Note
+    Ds6: Note
+    E6: Note
+    F6: Note
+    Fs6: Note
+    G6: Note
+    Gs6: Note
+    A6: Note
+    As6: Note
+    B6: Note
+  end
+end

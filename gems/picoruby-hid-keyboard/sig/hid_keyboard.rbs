@@ -1,0 +1,7 @@
+class HidKeyboard
+  # HID キーボード Boot Protocol レポートを送信する。
+  # 戻り値は USB 送信が成功したかどうか。
+  def self.press: (Integer keycode, ?Integer modifier) -> bool
+
+  def self.release_all: () -> bool
+end

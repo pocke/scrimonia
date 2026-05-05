@@ -1,0 +1,8 @@
+class PioUsbMidi
+  NOTE_ON: Integer
+  NOTE_OFF: Integer
+
+  # Pico-PIO-USB から MIDI イベントを1件取り出す。
+  # イベントがある場合 [status, note, velocity] を返し、なければ nil。
+  def self.receive: () -> Array[Integer]?
+end
