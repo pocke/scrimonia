@@ -102,12 +102,6 @@ export function TypingGame({ keymap, onHighlightChange, mode, romajiPreferences 
 
   const reverseKeymap = useMemo(() => buildReverseKeymap(keymap), [keymap])
 
-  // Reset game when mode changes
-  useEffect(() => {
-    setGame(createNewGameState(mode))
-    setElapsedMs(0)
-  }, [mode])
-
   // Highlight notes for the next expected key
   useEffect(() => {
     if (game.status === 'finished') {
