@@ -28,6 +28,8 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
 
     const activeNotes = new Set<number>()
     const attached = new Set<MIDIInput>()
+    let cancelled = false
+    let access: MIDIAccess | null = null
 
     const handleMidiMessage = (event: MIDIMessageEvent) => {
       const data = event.data
@@ -71,12 +73,19 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
       )
     }
 
+    const handleStateChange = () => {
+      if (access) refreshInputs(access)
+    }
+
     navigator.requestMIDIAccess()
       .then(midiAccess => {
+        if (cancelled) return
+        access = midiAccess
         refreshInputs(midiAccess)
-        midiAccess.addEventListener('statechange', () => refreshInputs(midiAccess))
+        midiAccess.addEventListener('statechange', handleStateChange)
       })
       .catch(err => {
+        if (cancelled) return
         setStatus({
           kind: 'denied',
           message: err instanceof Error ? err.message : String(err),
@@ -84,6 +93,8 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
       })
 
     return () => {
+      cancelled = true
+      access?.removeEventListener('statechange', handleStateChange)
       for (const input of attached) {
         input.removeEventListener('midimessage', handleMidiMessage)
       }
