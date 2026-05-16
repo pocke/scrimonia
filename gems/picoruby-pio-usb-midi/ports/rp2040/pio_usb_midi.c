@@ -139,7 +139,11 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
 static void set_interface_cb(tuh_xfer_t *xfer)
 {
   printf("[MIDI DBG] SET_INTERFACE result=%d\n", xfer->result);
-  if (xfer->result != XFER_RESULT_SUCCESS) return;
+  /* USB 2.0 §9.4.10: a device with only the default alternate setting MAY
+   * STALL SetInterface(). The MIDI bulk endpoint is unaffected, so treat
+   * STALLED the same as SUCCESS and proceed to start reception. */
+  if (xfer->result != XFER_RESULT_SUCCESS &&
+      xfer->result != XFER_RESULT_STALLED) return;
 
   tuh_xfer_t rx = {
     .daddr       = midi_daddr,
