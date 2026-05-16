@@ -67,7 +67,7 @@ class MidiPico
     private
 
     def handle_note_on(note, velocity)
-      print "NOTE_ON  #{Note.name_for(note)} velocity=#{velocity}\r\n"
+      print "{\"type\":\"note_on\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"velocity\":#{velocity}}\r\n"
 
       # MidiNote アクションがベロシティをパススルーするために記録
       @last_velocity = velocity
@@ -107,7 +107,7 @@ class MidiPico
     end
 
     def handle_note_off(note)
-      print "NOTE_OFF #{Note.name_for(note)}\r\n"
+      print "{\"type\":\"note_off\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\"}\r\n"
 
       pending_entry = remove_from_pending(note)
       if pending_entry
@@ -137,6 +137,7 @@ class MidiPico
       @active_layer_name = layer_name
       layer = @layers[@active_layer_name]
       @singles, @chords, @chord_note_set = layer
+      print "{\"type\":\"layer_change\",\"layer\":\"#{layer_name}\"}\r\n"
     end
 
     def press_action(action)
