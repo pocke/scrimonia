@@ -86,6 +86,10 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
 
     if (type == TUSB_DESC_INTERFACE && len >= sizeof(tusb_desc_interface_t)) {
       tusb_desc_interface_t const *itf = (tusb_desc_interface_t const *)p;
+      printf("[MIDI DBG] itf=%u alt=%u class=%02x sub=%02x proto=%02x\n",
+             itf->bInterfaceNumber, itf->bAlternateSetting,
+             itf->bInterfaceClass, itf->bInterfaceSubClass,
+             itf->bInterfaceProtocol);
       in_midi = (itf->bInterfaceClass == TUSB_CLASS_AUDIO &&
                  itf->bInterfaceSubClass == AUDIO_SUBCLASS_MIDI_STREAMING);
       if (in_midi) {
@@ -97,14 +101,21 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
         type == TUSB_DESC_ENDPOINT &&
         len >= sizeof(tusb_desc_endpoint_t)) {
       tusb_desc_endpoint_t const *ep = (tusb_desc_endpoint_t const *)p;
+      printf("[MIDI DBG] ep=%02x attr=%02x mps=%u\n",
+             ep->bEndpointAddress, ep->bmAttributes,
+             (unsigned)ep->wMaxPacketSize);
 
       if (tu_edpt_dir(ep->bEndpointAddress) == TUSB_DIR_IN) {
         midi_ep_in = ep->bEndpointAddress;
 
         if (!tuh_edpt_open(xfer->daddr, ep)) {
+          printf("[MIDI DBG] tuh_edpt_open FAILED ep=%02x\n",
+                 ep->bEndpointAddress);
           midi_ep_in = 0;
           return;
         }
+        printf("[MIDI DBG] tuh_edpt_open ok, sending SET_INTERFACE itf=%u alt=0\n",
+               midi_itf_num);
 
         /*
          * SET_INTERFACE を送ってインターフェースをアクティベートする。
@@ -118,6 +129,8 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
 
     p += len;
   }
+  printf("[MIDI DBG] parse done, midi_ep_in=%02x midi_itf_num=%u\n",
+         midi_ep_in, midi_itf_num);
 }
 
 /*
@@ -125,6 +138,7 @@ static void parse_config_descriptor(tuh_xfer_t *xfer)
  */
 static void set_interface_cb(tuh_xfer_t *xfer)
 {
+  printf("[MIDI DBG] SET_INTERFACE result=%d\n", xfer->result);
   if (xfer->result != XFER_RESULT_SUCCESS) return;
 
   tuh_xfer_t rx = {
@@ -140,7 +154,14 @@ static void set_interface_cb(tuh_xfer_t *xfer)
 static void push_event(uint8_t status, uint8_t data1, uint8_t data2)
 {
   uint8_t next = (ev_head + 1) % MIDI_EVENT_BUF_SIZE;
-  if (next == ev_tail) return;  /* full — drop */
+  if (next == ev_tail) {
+    static uint32_t dropped = 0;
+    dropped++;
+    if ((dropped & 0xff) == 1) {
+      printf("[MIDI DBG] ring full, dropped=%lu\n", (unsigned long)dropped);
+    }
+    return;  /* full — drop */
+  }
 
   event_buf[ev_head] = (midi_event_t){
     .status   = status,
@@ -161,7 +182,20 @@ static void push_event(uint8_t status, uint8_t data1, uint8_t data2)
  */
 static void midi_rx_cb(tuh_xfer_t *xfer)
 {
-  if (xfer->result == XFER_RESULT_SUCCESS && xfer->actual_len > 0) {
+  static uint32_t rx_count = 0;
+  if (xfer->result != XFER_RESULT_SUCCESS) {
+    printf("[MIDI DBG] rx_cb error result=%d\n", xfer->result);
+  } else if (xfer->actual_len == 0) {
+    if ((rx_count++ & 0xff) == 0) {
+      printf("[MIDI DBG] rx_cb zero-length (count=%lu)\n",
+             (unsigned long)rx_count);
+    }
+  } else {
+    if ((rx_count++ & 0x1f) == 0) {
+      printf("[MIDI DBG] rx len=%lu pkt0=%02x %02x %02x %02x\n",
+             (unsigned long)xfer->actual_len,
+             rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3]);
+    }
     for (uint32_t i = 0;
          i + USB_MIDI_PACKET_SIZE <= xfer->actual_len;
          i += USB_MIDI_PACKET_SIZE)
@@ -181,6 +215,12 @@ static void midi_rx_cb(tuh_xfer_t *xfer)
 
       if (msg == 0x90 || msg == 0x80) {
         push_event(msg, data1, data2);
+      } else {
+        static uint32_t other = 0;
+        if ((other++ & 0x1f) == 0) {
+          printf("[MIDI DBG] non-note pkt cin=%x status=%02x d1=%02x d2=%02x (count=%lu)\n",
+                 cin, status, data1, data2, (unsigned long)other);
+        }
       }
     }
   }
