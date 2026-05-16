@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { PianoSynth } from '../lib/pianoSynth'
 
 interface Props {
   onActiveNotesChange: (notes: number[]) => void
@@ -17,11 +18,30 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
       ? { kind: 'requesting' }
       : { kind: 'unsupported' },
   )
+  const [soundEnabled, setSoundEnabled] = useState(true)
 
   const onActiveNotesChangeRef = useRef(onActiveNotesChange)
   useEffect(() => {
     onActiveNotesChangeRef.current = onActiveNotesChange
   }, [onActiveNotesChange])
+
+  const synthRef = useRef<PianoSynth | null>(null)
+  if (synthRef.current === null) {
+    synthRef.current = new PianoSynth()
+  }
+
+  const soundEnabledRef = useRef(soundEnabled)
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+    if (!soundEnabled) synthRef.current?.releaseAll()
+  }, [soundEnabled])
+
+  useEffect(() => {
+    return () => {
+      synthRef.current?.destroy()
+      synthRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof navigator.requestMIDIAccess !== 'function') return
@@ -43,8 +63,10 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
           activeNotes.add(note)
           changed = true
         }
+        if (soundEnabledRef.current) synthRef.current?.noteOn(note, velocity)
       } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
         if (activeNotes.delete(note)) changed = true
+        synthRef.current?.noteOff(note)
       }
       if (changed) {
         onActiveNotesChangeRef.current(Array.from(activeNotes))
@@ -106,9 +128,21 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
   return (
     <div className="bg-gray-800 rounded-lg p-6 space-y-3">
       <p className="text-sm text-gray-400">
-        MIDI 入力をそのまま画面に映すモード。MidiPico のパススルー出力や直接接続した MIDI キーボードを弾くと、上のピアノ鍵盤が光ります。
+        MIDI 入力をそのまま画面に映すモード。MidiPico のパススルー出力や直接接続した MIDI キーボードを弾くと、上のピアノ鍵盤が光り、ピアノ風の音が鳴ります。
       </p>
-      <StatusView status={status} />
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <StatusView status={status} />
+        <button
+          onClick={() => setSoundEnabled(s => !s)}
+          className={`px-3 py-1.5 rounded text-sm ${
+            soundEnabled
+              ? 'bg-blue-600 text-white hover:bg-blue-500'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          {soundEnabled ? '音: ON' : '音: OFF'}
+        </button>
+      </div>
     </div>
   )
 }
