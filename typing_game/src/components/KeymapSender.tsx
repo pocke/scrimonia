@@ -1,13 +1,15 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { MidiPicoSerial, type UploadProgress } from '../lib/webSerial'
 
 interface Props {
   rawKeymap: string | null
+  serial: MidiPicoSerial
+  connected: boolean
+  setConnected: (connected: boolean) => void
+  onLine: (line: string) => void
 }
 
-export function KeymapSender({ rawKeymap }: Props) {
-  const serialRef = useRef(new MidiPicoSerial())
-  const [connected, setConnected] = useState(false)
+export function KeymapSender({ rawKeymap, serial, connected, setConnected, onLine }: Props) {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [message, setMessage] = useState('')
@@ -18,11 +20,11 @@ export function KeymapSender({ rawKeymap }: Props) {
     setMessage('')
     try {
       if (connected) {
-        await serialRef.current.disconnect()
+        await serial.disconnect()
         setConnected(false)
         setMessage('切断しました')
       } else {
-        await serialRef.current.connect()
+        await serial.connect({ onLine })
         setConnected(true)
         setMessage('接続しました')
       }
@@ -30,7 +32,7 @@ export function KeymapSender({ rawKeymap }: Props) {
       setError(e instanceof Error ? e.message : String(e))
       setConnected(false)
     }
-  }, [connected])
+  }, [connected, serial, setConnected, onLine])
 
   const handleUpload = useCallback(async () => {
     if (!rawKeymap) return
@@ -39,14 +41,14 @@ export function KeymapSender({ rawKeymap }: Props) {
     setProgress(null)
     setUploading(true)
     try {
-      await serialRef.current.uploadFile(rawKeymap, setProgress)
+      await serial.uploadFile(rawKeymap, setProgress)
       setMessage('送信完了! キーマップを再読み込みしました')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setUploading(false)
     }
-  }, [rawKeymap])
+  }, [rawKeymap, serial])
 
   if (!MidiPicoSerial.isSupported()) {
     return (

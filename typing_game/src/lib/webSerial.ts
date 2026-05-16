@@ -1,13 +1,22 @@
 /**
  * WebSerial wrapper for communicating with MidiPico.
  *
- * Implements the chunked upload protocol:
- *   PC → Pico: UPLOAD_START\n
- *   Pico → PC: UPLOAD_READY\n
- *   PC → Pico: CHUNK <hex_len>\n + <raw data>  (repeat)
- *   Pico → PC: CHUNK_OK\n
- *   PC → Pico: UPLOAD_END\n
- *   Pico → PC: UPLOAD_OK\n
+ * Implements both directions:
+ *
+ *   1. Chunked keymap upload protocol:
+ *        PC → Pico: UPLOAD_START\n
+ *        Pico → PC: UPLOAD_READY\n
+ *        PC → Pico: CHUNK <hex_len>\n + <raw data>  (repeat)
+ *        Pico → PC: CHUNK_OK\n
+ *        PC → Pico: UPLOAD_END\n
+ *        Pico → PC: UPLOAD_OK\n
+ *
+ *   2. Continuous CDC log stream from the device. Every line received
+ *      while connected is forwarded to the `onLine` callback registered
+ *      at connect() time. Lines that look like upload protocol responses
+ *      are also routed to whichever uploadFile() invocation is currently
+ *      awaiting them, so log lines emitted during an upload do not
+ *      desynchronize the stop-and-wait protocol.
  */
 
 const CHUNK_SIZE = 256
@@ -18,11 +27,24 @@ export type UploadProgress = {
   totalBytes: number
 }
 
+export interface ConnectOptions {
+  onLine?: (line: string) => void
+}
+
+interface PendingLine {
+  resolve: (line: string) => void
+  reject: (err: Error) => void
+  cancelled: boolean
+}
+
 export class MidiPicoSerial {
   private port: SerialPort | null = null
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   private writer: WritableStreamDefaultWriter<Uint8Array> | null = null
   private readBuffer = ''
+  private readLoopPromise: Promise<void> | null = null
+  private onLine: ((line: string) => void) | null = null
+  private pendingLines: PendingLine[] = []
 
   static isSupported(): boolean {
     return 'serial' in navigator
@@ -32,7 +54,7 @@ export class MidiPicoSerial {
     return this.port !== null
   }
 
-  async connect(): Promise<void> {
+  async connect(opts: ConnectOptions = {}): Promise<void> {
     const port = await navigator.serial.requestPort({
       filters: [{ usbVendorId: 0xcafe, usbProductId: 0x4005 }],
     })
@@ -42,11 +64,23 @@ export class MidiPicoSerial {
     this.reader = port.readable!.getReader()
     this.writer = port.writable!.getWriter()
     this.readBuffer = ''
+    this.onLine = opts.onLine ?? null
+    this.readLoopPromise = this.readLoop()
   }
 
   async disconnect(): Promise<void> {
+    for (const pending of this.pendingLines) {
+      if (pending.cancelled) continue
+      pending.cancelled = true
+      pending.reject(new Error('Disconnected'))
+    }
+    this.pendingLines = []
+
     try {
-      this.reader?.releaseLock()
+      // cancel() unblocks the read loop so it can exit; without this
+      // releaseLock + close can hang waiting for a pending read().
+      await this.reader?.cancel().catch(() => {})
+      await this.readLoopPromise?.catch(() => {})
       this.writer?.releaseLock()
       await this.port?.close()
     } finally {
@@ -54,6 +88,8 @@ export class MidiPicoSerial {
       this.writer = null
       this.port = null
       this.readBuffer = ''
+      this.onLine = null
+      this.readLoopPromise = null
     }
   }
 
@@ -61,21 +97,17 @@ export class MidiPicoSerial {
     content: string,
     onProgress?: (progress: UploadProgress) => void,
   ): Promise<void> {
-    if (!this.writer || !this.reader) {
-      throw new Error('Not connected')
-    }
+    if (!this.writer) throw new Error('Not connected')
 
     const data = new TextEncoder().encode(content)
     const totalBytes = data.byteLength
 
-    // 1. Send UPLOAD_START
     await this.sendLine('UPLOAD_START')
-    const ready = await this.readLine()
+    const ready = await this.waitForProtocolResponse()
     if (ready !== 'UPLOAD_READY') {
       throw new Error(`Expected UPLOAD_READY, got: ${ready}`)
     }
 
-    // 2. Send chunks
     let offset = 0
     while (offset < totalBytes) {
       const end = Math.min(offset + CHUNK_SIZE, totalBytes)
@@ -85,7 +117,7 @@ export class MidiPicoSerial {
       await this.sendLine(`CHUNK ${hexLen}`)
       await this.sendBytes(chunk)
 
-      const ack = await this.readLine()
+      const ack = await this.waitForProtocolResponse()
       if (ack !== 'CHUNK_OK') {
         throw new Error(`Expected CHUNK_OK, got: ${ack}`)
       }
@@ -94,51 +126,83 @@ export class MidiPicoSerial {
       onProgress?.({ sentBytes: offset, totalBytes })
     }
 
-    // 3. Send UPLOAD_END
     await this.sendLine('UPLOAD_END')
-    const result = await this.readLine()
+    const result = await this.waitForProtocolResponse()
     if (result !== 'UPLOAD_OK') {
       throw new Error(`Expected UPLOAD_OK, got: ${result}`)
     }
   }
 
   private async sendLine(line: string): Promise<void> {
-    const data = new TextEncoder().encode(line + '\n')
-    await this.writer!.write(data)
+    await this.writer!.write(new TextEncoder().encode(line + '\n'))
   }
 
   private async sendBytes(data: Uint8Array): Promise<void> {
     await this.writer!.write(data)
   }
 
-  private async readLine(): Promise<string> {
-    const deadline = Date.now() + RESPONSE_TIMEOUT_MS
-
-    while (true) {
-      const newlineIdx = this.readBuffer.indexOf('\n')
-      if (newlineIdx !== -1) {
-        const line = this.readBuffer.slice(0, newlineIdx).replace(/\r$/, '')
-        this.readBuffer = this.readBuffer.slice(newlineIdx + 1)
-        return line
+  private async readLoop(): Promise<void> {
+    const reader = this.reader
+    if (!reader) return
+    const decoder = new TextDecoder()
+    try {
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        if (!value) continue
+        this.readBuffer += decoder.decode(value, { stream: true })
+        let idx = this.readBuffer.indexOf('\n')
+        while (idx !== -1) {
+          const line = this.readBuffer.slice(0, idx).replace(/\r$/, '')
+          this.readBuffer = this.readBuffer.slice(idx + 1)
+          this.dispatchLine(line)
+          idx = this.readBuffer.indexOf('\n')
+        }
       }
-
-      const remaining = deadline - Date.now()
-      if (remaining <= 0) {
-        throw new Error('Timeout waiting for device response')
-      }
-
-      const { value, done } = await Promise.race([
-        this.reader!.read(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout waiting for device response')), remaining),
-        ),
-      ])
-
-      if (done || !value) {
-        throw new Error('Serial port closed unexpectedly')
-      }
-
-      this.readBuffer += new TextDecoder().decode(value)
+    } catch {
+      /* stream closed */
+    } finally {
+      try { reader.releaseLock() } catch { /* already released */ }
     }
+  }
+
+  private dispatchLine(line: string): void {
+    this.onLine?.(line)
+    while (this.pendingLines.length > 0) {
+      const entry = this.pendingLines.shift()!
+      if (entry.cancelled) continue
+      entry.resolve(line)
+      return
+    }
+  }
+
+  private async waitForProtocolResponse(): Promise<string> {
+    const deadline = Date.now() + RESPONSE_TIMEOUT_MS
+    while (true) {
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) throw new Error('Timeout waiting for device response')
+      const line = await this.waitForNextLine(remaining)
+      if (this.isProtocolLine(line)) return line
+    }
+  }
+
+  private waitForNextLine(timeoutMs: number): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const entry: PendingLine = { resolve, reject, cancelled: false }
+      this.pendingLines.push(entry)
+      setTimeout(() => {
+        if (entry.cancelled) return
+        entry.cancelled = true
+        reject(new Error('Timeout waiting for device response'))
+      }, timeoutMs)
+    })
+  }
+
+  private isProtocolLine(line: string): boolean {
+    return line === 'UPLOAD_READY' ||
+      line === 'CHUNK_OK' ||
+      line === 'UPLOAD_OK' ||
+      line.startsWith('UPLOAD_ERROR') ||
+      line.startsWith('CHUNK_ERROR')
   }
 }
