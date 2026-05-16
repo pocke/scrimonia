@@ -195,11 +195,6 @@ static void midi_rx_cb(tuh_xfer_t *xfer)
              (unsigned long)rx_count);
     }
   } else {
-    if ((rx_count++ & 0x1f) == 0) {
-      printf("[MIDI DBG] rx len=%lu pkt0=%02x %02x %02x %02x\n",
-             (unsigned long)xfer->actual_len,
-             rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3]);
-    }
     for (uint32_t i = 0;
          i + USB_MIDI_PACKET_SIZE <= xfer->actual_len;
          i += USB_MIDI_PACKET_SIZE)
