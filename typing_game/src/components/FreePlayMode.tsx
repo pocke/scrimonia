@@ -26,22 +26,20 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
   }, [onActiveNotesChange])
 
   const synthRef = useRef<PianoSynth | null>(null)
-  if (synthRef.current === null) {
-    synthRef.current = new PianoSynth()
-  }
+  useEffect(() => {
+    const synth = new PianoSynth()
+    synthRef.current = synth
+    return () => {
+      synth.destroy()
+      synthRef.current = null
+    }
+  }, [])
 
   const soundEnabledRef = useRef(soundEnabled)
   useEffect(() => {
     soundEnabledRef.current = soundEnabled
     if (!soundEnabled) synthRef.current?.releaseAll()
   }, [soundEnabled])
-
-  useEffect(() => {
-    return () => {
-      synthRef.current?.destroy()
-      synthRef.current = null
-    }
-  }, [])
 
   useEffect(() => {
     if (typeof navigator.requestMIDIAccess !== 'function') return

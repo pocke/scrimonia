@@ -36,7 +36,7 @@ class Voice {
     this.ctx = ctx
     const freq = midiNoteToFrequency(note)
     const now = ctx.currentTime
-    const peak = Math.max(velocity, 1) / 127 * 0.5
+    const peak = velocity / 127 * 0.5
 
     this.gain = ctx.createGain()
     this.gain.gain.setValueAtTime(0, now)
@@ -107,7 +107,6 @@ export class PianoSynth {
 
   noteOff(note: number) {
     this.voices.get(note)?.release()
-    this.voices.delete(note)
   }
 
   releaseAll() {
