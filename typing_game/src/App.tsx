@@ -4,8 +4,11 @@ import { KeymapUploader } from './components/KeymapUploader'
 import { KeymapSender } from './components/KeymapSender'
 import { PianoKeyboard } from './components/PianoKeyboard'
 import { TypingGame, type GameMode } from './components/TypingGame'
+import { FreePlayMode } from './components/FreePlayMode'
 import { SettingsModal } from './components/SettingsModal'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
+
+type AppMode = GameMode | 'free'
 
 const KEYMAP_STORAGE_KEY = 'midipico-keymap-data'
 const RAW_KEYMAP_STORAGE_KEY = 'midipico-raw-keymap'
@@ -27,10 +30,13 @@ function saveKeymapToStorage(data: KeymapData): void {
 function App() {
   const [keymap, setKeymap] = useState<KeymapData | null>(loadKeymapFromStorage)
   const [rawKeymap, setRawKeymap] = useState<string | null>(() => localStorage.getItem(RAW_KEYMAP_STORAGE_KEY))
-  const [highlightNotes, setHighlightNotes] = useState<number[] | undefined>()
-  const [gameMode, setGameMode] = useState<GameMode>('en')
+  const [typingHighlightNotes, setTypingHighlightNotes] = useState<number[] | undefined>()
+  const [midiActiveNotes, setMidiActiveNotes] = useState<number[]>([])
+  const [appMode, setAppMode] = useState<AppMode>('en')
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
+
+  const highlightNotes = appMode === 'free' ? midiActiveNotes : typingHighlightNotes
 
   const defaultLayer = keymap ? (keymap['default'] ?? Object.values(keymap)[0]) : null
 
@@ -57,9 +63,9 @@ function App() {
           <>
             <div className="flex gap-2 items-center flex-wrap">
               <button
-                onClick={() => setGameMode('en')}
+                onClick={() => setAppMode('en')}
                 className={`px-4 py-2 rounded text-sm ${
-                  gameMode === 'en'
+                  appMode === 'en'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
@@ -67,14 +73,24 @@ function App() {
                 英字モード
               </button>
               <button
-                onClick={() => setGameMode('ja')}
+                onClick={() => setAppMode('ja')}
                 className={`px-4 py-2 rounded text-sm ${
-                  gameMode === 'ja'
+                  appMode === 'ja'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
                 ローマ字モード
+              </button>
+              <button
+                onClick={() => setAppMode('free')}
+                className={`px-4 py-2 rounded text-sm ${
+                  appMode === 'free'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                自由演奏モード
               </button>
               <button
                 onClick={() => setShowSettings(true)}
@@ -90,7 +106,11 @@ function App() {
               </div>
             </div>
             <PianoKeyboard keymap={defaultLayer} highlightNotes={highlightNotes} />
-            <TypingGame key={gameMode} keymap={defaultLayer} onHighlightChange={setHighlightNotes} mode={gameMode} romajiPreferences={romajiPreferences} />
+            {appMode === 'free' ? (
+              <FreePlayMode onActiveNotesChange={setMidiActiveNotes} />
+            ) : (
+              <TypingGame key={appMode} keymap={defaultLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
+            )}
           </>
         )}
       </main>
