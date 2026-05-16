@@ -35,6 +35,7 @@ interface PendingLine {
   resolve: (line: string) => void
   reject: (err: Error) => void
   cancelled: boolean
+  timer: ReturnType<typeof setTimeout> | null
 }
 
 export class MidiPicoSerial {
@@ -72,6 +73,7 @@ export class MidiPicoSerial {
     for (const pending of this.pendingLines) {
       if (pending.cancelled) continue
       pending.cancelled = true
+      if (pending.timer !== null) clearTimeout(pending.timer)
       pending.reject(new Error('Disconnected'))
     }
     this.pendingLines = []
@@ -160,9 +162,9 @@ export class MidiPicoSerial {
         }
       }
     } catch {
-      /* stream closed */
+      // stream cancelled or closed by the peer
     } finally {
-      try { reader.releaseLock() } catch { /* already released */ }
+      try { reader.releaseLock() } catch { /* lock already released by disconnect */ }
     }
   }
 
@@ -171,6 +173,8 @@ export class MidiPicoSerial {
     while (this.pendingLines.length > 0) {
       const entry = this.pendingLines.shift()!
       if (entry.cancelled) continue
+      entry.cancelled = true
+      if (entry.timer !== null) clearTimeout(entry.timer)
       entry.resolve(line)
       return
     }
@@ -188,13 +192,13 @@ export class MidiPicoSerial {
 
   private waitForNextLine(timeoutMs: number): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      const entry: PendingLine = { resolve, reject, cancelled: false }
-      this.pendingLines.push(entry)
-      setTimeout(() => {
+      const entry: PendingLine = { resolve, reject, cancelled: false, timer: null }
+      entry.timer = setTimeout(() => {
         if (entry.cancelled) return
         entry.cancelled = true
         reject(new Error('Timeout waiting for device response'))
       }, timeoutMs)
+      this.pendingLines.push(entry)
     })
   }
 

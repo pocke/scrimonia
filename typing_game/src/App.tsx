@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeymapData } from './types'
 import { KeymapUploader } from './components/KeymapUploader'
 import { KeymapSender } from './components/KeymapSender'
@@ -41,8 +41,9 @@ function App() {
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
 
-  const serial = useMemo(() => new MidiPicoSerial(), [])
+  const [serial] = useState(() => new MidiPicoSerial())
   const [serialConnected, setSerialConnected] = useState(false)
+  useEffect(() => () => { void serial.disconnect() }, [serial])
   const [deviceLines, setDeviceLines] = useState<DeviceLogLine[]>([])
   const [activeLayerName, setActiveLayerName] = useState<string>('default')
   const lineIdRef = useRef(0)
