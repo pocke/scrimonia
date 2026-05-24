@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react'
-import { MidiPicoSerial, type UploadProgress } from '../lib/webSerial'
+import { ScrimoniaSerial, type UploadProgress } from '../lib/webSerial'
 
 interface Props {
   rawKeymap: string | null
-  serial: MidiPicoSerial
+  serial: ScrimoniaSerial
   connected: boolean
   setConnected: (connected: boolean) => void
   onLine: (line: string) => void
@@ -50,7 +50,7 @@ export function KeymapSender({ rawKeymap, serial, connected, setConnected, onLin
     }
   }, [rawKeymap, serial])
 
-  if (!MidiPicoSerial.isSupported()) {
+  if (!ScrimoniaSerial.isSupported()) {
     return (
       <div className="text-sm text-gray-500">
         WebSerial API は Chrome または Edge でのみ利用できます

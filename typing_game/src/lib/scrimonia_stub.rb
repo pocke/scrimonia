@@ -1,6 +1,6 @@
 require 'js'
 
-class MidiPico
+class Scrimonia
   def initialize
     @layers = {}
   end
@@ -80,6 +80,6 @@ class MidiPico
       layer_parts << '"' + name + '":[' + entry_strs.join(",") + ']'
     end
     json = "{" + layer_parts.join(",") + "}"
-    JS.global.midiPicoKeymapDataJson = json
+    JS.global.scrimoniaKeymapDataJson = json
   end
 end

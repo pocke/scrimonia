@@ -1,5 +1,5 @@
 /**
- * WebSerial wrapper for communicating with MidiPico.
+ * WebSerial wrapper for communicating with Scrimonia.
  *
  * Implements both directions:
  *
@@ -38,7 +38,7 @@ interface PendingLine {
   timer: ReturnType<typeof setTimeout> | null
 }
 
-export class MidiPicoSerial {
+export class ScrimoniaSerial {
   private port: SerialPort | null = null
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   private writer: WritableStreamDefaultWriter<Uint8Array> | null = null

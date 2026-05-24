@@ -39,7 +39,7 @@ main(void)
   for (int i = 0; i < 20 && !tud_cdc_connected(); i++) {
     sleep_ms(100);
   }
-  printf("[Core0] midipico booted (clock=%luHz)\n", clock_get_hz(clk_sys));
+  printf("[Core0] scrimonia booted (clock=%luHz)\n", clock_get_hz(clk_sys));
 
   /* mruby/c VM */
   mrbc_init(heap_pool, HEAP_SIZE);

@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   module Action
     class Keycode
       attr_reader :keycode

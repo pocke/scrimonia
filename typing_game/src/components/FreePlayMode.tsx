@@ -126,7 +126,7 @@ export function FreePlayMode({ onActiveNotesChange }: Props) {
   return (
     <div className="bg-gray-800 rounded-lg p-6 space-y-3">
       <p className="text-sm text-gray-400">
-        MIDI 入力をそのまま画面に映すモード。MidiPico のパススルー出力や直接接続した MIDI キーボードを弾くと、上のピアノ鍵盤が光り、ピアノ風の音が鳴ります。
+        MIDI 入力をそのまま画面に映すモード。Scrimonia のパススルー出力や直接接続した MIDI キーボードを弾くと、上のピアノ鍵盤が光り、ピアノ風の音が鳴ります。
       </p>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <StatusView status={status} />

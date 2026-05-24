@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   module Notes
     C2  = Note.new(36);  Cs2 = Note.new(37);  D2  = Note.new(38)
     Ds2 = Note.new(39);  E2  = Note.new(40);  F2  = Note.new(41)

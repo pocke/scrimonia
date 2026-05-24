@@ -16,7 +16,7 @@ export const DEFAULT_PREFERENCES: RomajiPreferences = {
   ji: 'zi',
 }
 
-const STORAGE_KEY = 'midipico-romaji-preferences'
+const STORAGE_KEY = 'scrimonia-romaji-preferences'
 
 export function loadPreferences(): RomajiPreferences {
   try {

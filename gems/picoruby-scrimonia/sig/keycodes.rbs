@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   module Keycodes
     # アルファベット
     KC_A: Action::Keycode

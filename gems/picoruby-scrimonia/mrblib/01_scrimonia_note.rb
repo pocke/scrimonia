@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   class Note
     NOTE_NAMES = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"]
 

@@ -1,7 +1,7 @@
 require "fileutils"
 
 PICO_SDK_TAG = "2.1.0"
-BUILD_CONFIG = "midipico-cortex-m0plus"
+BUILD_CONFIG = "scrimonia-cortex-m0plus"
 BUILD_DIR = "build"
 
 # pico-sdk と pico-extras は PicoRuby の R2P2 gem に git submodule として含まれている。
@@ -39,7 +39,7 @@ file "lib/picoruby" do
 end
 
 # Stage 1: PicoRuby (mruby/c VM + gem) のクロスコンパイル
-# build_config/midipico-cortex-m0plus.rb の設定に従い、
+# build_config/scrimonia-cortex-m0plus.rb の設定に従い、
 # arm-none-eabi-gcc で Cortex-M0+ 向けの libmruby.a を生成する。
 # このライブラリには VM 本体、組み込み gem のCコード、picogem_init.c が含まれる。
 task :libmruby => "lib/picoruby" do
@@ -59,7 +59,7 @@ end
 
 # Stage 3: ファームウェアのビルド
 # CMake が生成した Makefile を実行し、C ソース・ポートファイル・libmruby.a を
-# リンクして midipico.uf2 を生成する。
+# リンクして scrimonia.uf2 を生成する。
 task :build do
   sh "cmake --build #{BUILD_DIR}"
 end

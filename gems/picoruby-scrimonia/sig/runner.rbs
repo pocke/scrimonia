@@ -1,6 +1,6 @@
-class MidiPico
+class Scrimonia
   # MIDI イベントループとキーマップ実行を担う内部クラス。
-  # `MidiPico#start!` から `Runner.new(layer_definitions).run` で起動される。
+  # `Scrimonia#start!` から `Runner.new(layer_definitions).run` で起動される。
   #
   # 内部のデータ構造は深い入れ子の Hash/Array で表現される (mruby/c の
   # Hash が Array キーをポインタ比較する制約への対応)。下記の型エイリアス
