@@ -78,19 +78,16 @@ class Scrimonia
         @pending << [note, velocity]
         @pending_start = @tick if @pending.size == 1
 
-        sorted = pending_sorted_notes
-        chord_action = find_chord(sorted)
-
-        if chord_action && !prefix_of_longer_chord?(sorted)
-          commit_chord_action(chord_action, sorted)
-          @pending.clear
-          @pending_match = nil
-        elsif chord_action
-          # 完全マッチだが、より長い和音 ([E3,G3] に対する [E3,G3,B3] のように) の
-          # prefix にもなり得る。暫定マッチを保持してノート追加を待つ。
-          @pending_match = [chord_action, sorted]
-        elsif !prefix_of_any_chord?(sorted)
+        unless evaluate_pending
+          # 追加したばかりの note を含めると、もはやどの和音の部分集合にもならない。
+          # 旧 pending (= note 追加前) を確定処理し、note を新規 pending の起点として
+          # 再評価する。こうしないと例えば [E3,G3] 暫定マッチ中に F3 が押された場合、
+          # KC_Z (E3+G3) を確定発火する一方で F3 が pending クリアと共に lost する。
+          @pending.pop
           finalize_pending
+          @pending << [note, velocity]
+          @pending_start = @tick
+          evaluate_pending
         end
       else
         finalize_pending if @pending.size > 0
@@ -199,6 +196,32 @@ class Scrimonia
         end
       end
       switch_layer(action.layer_name)
+    end
+
+    # @pending の現在の内容に対して和音判定を行う。確定発火・暫定マッチ・
+    # 待機のいずれかに進められたら true を返す。完全マッチも prefix も無い
+    # (= 入力がどの和音定義からも外れた) 場合は false を返し、呼び出し側が
+    # 旧 pending の整理を行う余地を残す。
+    def evaluate_pending
+      sorted = pending_sorted_notes
+      chord_action = find_chord(sorted)
+
+      if chord_action && !prefix_of_longer_chord?(sorted)
+        commit_chord_action(chord_action, sorted)
+        @pending.clear
+        @pending_match = nil
+        true
+      elsif chord_action
+        # 完全マッチだが、より長い和音 ([E3,G3] に対する [E3,G3,B3] のように) の
+        # prefix にもなり得る。暫定マッチを保持してノート追加を待つ。
+        @pending_match = [chord_action, sorted]
+        true
+      elsif prefix_of_any_chord?(sorted)
+        # まだ確定しないが続行は可能
+        true
+      else
+        false
+      end
     end
 
     # 和音アクションを press する共通処理。LayerChange ならレイヤー切替、それ

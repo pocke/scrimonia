@@ -47,6 +47,7 @@ class Scrimonia
     def retry_release: () -> void
     def apply_layer_change: (Action::LayerChange action, Array[Integer] notes) -> void
     def commit_chord_action: (layer_value action, Array[Integer] notes) -> void
+    def evaluate_pending: () -> bool
     def finalize_pending: () -> void
     def flush_pending: () -> void
     def build_layer: (Hash[layer_key, layer_value] mapping) -> layer_data
