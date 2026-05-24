@@ -75,7 +75,64 @@ mp.add_layer :default, {
   [D4, E4] => KC_ESC,
   [B3, C4] => KC_SPC,
 
-  # C3+Cs3+D3 同時押しでパススルーレイヤーに切り替え
+  # C3+Cs3+D3 同時押しで chord (ダイアトニックコード) レイヤーに切り替え。
+  # 3レイヤーは default -> chord -> passthrough -> default のループ。
+  [C3, Cs3, D3] => Scrimonia::Action::LayerChange.new(:chord, :switch),
+}
+
+# chord レイヤー: Cメジャーのダイアトニックコードでタイピングする。
+# - 単音 (ルート) → ホームロウ (asdfghjkl) ※ example の default と同じ位置
+# - 3和音 (ルート + 3rd + 5th) → トップロウ (qwertyuio)
+# - 2和音 (ルート + 3rd) → ボトムロウ (zxcvbnm,.)
+# - 黒鍵 → 数字ロウ (ベロシティ無視)
+# - 「; の列」(G4 起点) は鍵盤の上端を超えるため未定義
+mp.add_layer :chord, {
+  # 単音 (ベース音) → ホームロウ
+  E3 => KC_A,
+  F3 => KC_S,
+  G3 => KC_D,
+  A3 => KC_F,
+  B3 => KC_G,
+  C4 => KC_H,
+  D4 => KC_J,
+  E4 => KC_K,
+  F4 => KC_L,
+
+  # 黒鍵 → 数字ロウ
+  Cs3 => KC_1,
+  Ds3 => KC_2,
+  Fs3 => KC_3,
+  Gs3 => KC_4,
+  As3 => KC_5,
+  Cs4 => KC_6,
+  Ds4 => KC_7,
+  Fs4 => KC_8,
+  Gs4 => KC_9,
+  As4 => KC_0,
+
+  # 3和音 → トップロウ
+  [E3, G3, B3] => KC_Q,  # Em
+  [F3, A3, C4] => KC_W,  # F
+  [G3, B3, D4] => KC_E,  # G
+  [A3, C4, E4] => KC_R,  # Am
+  [B3, D4, F4] => KC_T,  # Bdim
+  [C4, E4, G4] => KC_Y,  # C
+  [D4, F4, A4] => KC_U,  # Dm
+  [E4, G4, B4] => KC_I,  # Em (1オクターブ上)
+  [F4, A4, C5] => KC_O,  # F  (1オクターブ上)
+
+  # 2和音 → ボトムロウ (3和音から 5th を抜いたルート+3rd)
+  [E3, G3] => KC_Z,
+  [F3, A3] => KC_X,
+  [G3, B3] => KC_C,
+  [A3, C4] => KC_V,
+  [B3, D4] => KC_B,
+  [C4, E4] => KC_N,
+  [D4, F4] => KC_M,
+  [E4, G4] => KC_COMM,
+  [F4, A4] => KC_DOT,
+
+  # C3+Cs3+D3 で passthrough レイヤーへ
   [C3, Cs3, D3] => Scrimonia::Action::LayerChange.new(:passthrough, :switch),
 }
 
