@@ -1,11 +1,11 @@
-# scrimonia
-
-読み方: スクリモニア (IPA: /skriˈmɔːnja/)
-
-イタリア語の *scrivere* (書く) と *armonia* (和音) を合わせた造語。MIDI キーボードで弾いた和音を文字入力に変換する、というプロジェクトの本質を名前に込めている。
+# Scrimonia
 
 USB MIDIキーボードを文字入力キーボードとして使うための変換装置。
 Raspberry Pi Pico と PicoRuby で実装する。
+
+読み方: スクリモニア (IPA: /skriˈmɔːnja/)
+
+イタリア語の *scrivere* (書く) と *armonia* (和音) から。
 
 ## 概要
 
