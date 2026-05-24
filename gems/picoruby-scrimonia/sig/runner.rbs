@@ -24,6 +24,7 @@ class Scrimonia
     @hold_returns: Hash[Integer, Symbol]
     @pending: Array[[Integer, Integer]]
     @pending_start: Integer
+    @pending_match: [layer_value, Array[Integer]]?
     @active_chord_action: layer_value?
     @active_chord_notes: Array[Integer]
     @tick: Integer
@@ -45,12 +46,16 @@ class Scrimonia
     def send_hid_release: () -> void
     def retry_release: () -> void
     def apply_layer_change: (Action::LayerChange action, Array[Integer] notes) -> void
+    def commit_chord_action: (layer_value action, Array[Integer] notes) -> void
+    def evaluate_pending: () -> bool
+    def finalize_pending: () -> void
     def flush_pending: () -> void
     def build_layer: (Hash[layer_key, layer_value] mapping) -> layer_data
     def find_action: (Array[[(Integer | Range[Integer])?, layer_value]]? entries, Integer velocity) -> layer_value?
     def pending_sorted_notes: () -> Array[Integer]
     def find_chord: (Array[Integer] sorted_notes) -> layer_value?
     def prefix_of_any_chord?: (Array[Integer] sorted_notes) -> bool
+    def prefix_of_longer_chord?: (Array[Integer] sorted_notes) -> bool
     def remove_from_pending: (Integer note) -> [Integer, Integer]?
 
     # 挿入ソート (mruby/c に Array#sort がないため)。yield でソートキーを抽出する。

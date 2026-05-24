@@ -23,6 +23,9 @@ class Scrimonia
       # 和音判定用: ノート入力を一時バッファして和音マッチを試みる
       @pending = []
       @pending_start = 0
+      # @pending が完全マッチしたが、より長い和音にもなり得る場合の暫定マッチ。
+      # [action, sorted_notes] を保持し、タイムアウト or 続行不能になったら確定発火する。
+      @pending_match = nil
       @active_chord_action = nil
       @active_chord_notes = []
       @tick = 0
@@ -48,8 +51,7 @@ class Scrimonia
         end
 
         if @pending.size > 0 && (@tick - @pending_start) >= CHORD_TIMEOUT_MS
-          flush_pending
-          @pending.clear
+          finalize_pending
         end
 
         # HID release が前回失敗していたらリトライ
@@ -76,26 +78,19 @@ class Scrimonia
         @pending << [note, velocity]
         @pending_start = @tick if @pending.size == 1
 
-        sorted = pending_sorted_notes
-        chord_action = find_chord(sorted)
-        if chord_action
-          if chord_action.is_a?(Action::LayerChange)
-            apply_layer_change(chord_action, sorted)
-          else
-            @active_chord_action = chord_action
-            @active_chord_notes = sorted
-            press_action(chord_action)
-          end
-          @pending.clear
-        elsif !prefix_of_any_chord?(sorted)
-          flush_pending
-          @pending.clear
+        unless evaluate_pending
+          # 追加したばかりの note を含めると、もはやどの和音の部分集合にもならない。
+          # 旧 pending (= note 追加前) を確定処理し、note を新規 pending の起点として
+          # 再評価する。こうしないと例えば [E3,G3] 暫定マッチ中に F3 が押された場合、
+          # KC_Z (E3+G3) を確定発火する一方で F3 が pending クリアと共に lost する。
+          @pending.pop
+          finalize_pending
+          @pending << [note, velocity]
+          @pending_start = @tick
+          evaluate_pending
         end
       else
-        if @pending.size > 0
-          flush_pending
-          @pending.clear
-        end
+        finalize_pending if @pending.size > 0
         action = find_action(@singles[note], velocity)
         if action.is_a?(Action::LayerChange)
           apply_layer_change(action, [note])
@@ -111,15 +106,33 @@ class Scrimonia
 
       pending_entry = remove_from_pending(note)
       if pending_entry
-        # 和音判定中に NOTE_OFF が来た場合、単体ノートとして即発火＋即リリース。
-        # MIDI キーボードは短いタップで 50ms 未満の NOTE_ON→OFF を送るため、
-        # 待たずに処理しないとキー入力がロストする。
-        action = find_action(@singles[note], pending_entry[1])
-        if action.is_a?(Action::LayerChange)
-          apply_layer_change(action, [note])
-        elsif action
-          press_action(action)
-          release_action(action)
+        match = @pending_match
+        if match
+          # 暫定マッチがある状態で和音タップが終わりかけている。50ms 未満で
+          # 弾き切られた subset 関係の和音 (例: [E3,G3] と [E3,G3,B3] が両方
+          # 定義されている時の [E3,G3] のタップ) を取りこぼさないよう、
+          # 暫定マッチを press+release で確定発火する。
+          chord_action = match[0]
+          chord_notes = match[1]
+          if chord_action.is_a?(Action::LayerChange)
+            apply_layer_change(chord_action, chord_notes)
+          else
+            press_action(chord_action)
+            release_action(chord_action)
+          end
+          @pending.clear
+          @pending_match = nil
+        else
+          # 和音判定中に NOTE_OFF が来た場合、単体ノートとして即発火＋即リリース。
+          # MIDI キーボードは短いタップで 50ms 未満の NOTE_ON→OFF を送るため、
+          # 待たずに処理しないとキー入力がロストする。
+          action = find_action(@singles[note], pending_entry[1])
+          if action.is_a?(Action::LayerChange)
+            apply_layer_change(action, [note])
+          elsif action
+            press_action(action)
+            release_action(action)
+          end
         end
       elsif (return_layer = @hold_returns.delete(note))
         switch_layer(return_layer)
@@ -129,7 +142,7 @@ class Scrimonia
         @active_chord_notes = []
       else
         action = @pressed.delete(note)
-        release_action(action)
+        release_action(action) if action
       end
     end
 
@@ -183,6 +196,57 @@ class Scrimonia
         end
       end
       switch_layer(action.layer_name)
+    end
+
+    # @pending の現在の内容に対して和音判定を行う。確定発火・暫定マッチ・
+    # 待機のいずれかに進められたら true を返す。完全マッチも prefix も無い
+    # (= 入力がどの和音定義からも外れた) 場合は false を返し、呼び出し側が
+    # 旧 pending の整理を行う余地を残す。
+    def evaluate_pending
+      sorted = pending_sorted_notes
+      chord_action = find_chord(sorted)
+
+      if chord_action && !prefix_of_longer_chord?(sorted)
+        commit_chord_action(chord_action, sorted)
+        @pending.clear
+        @pending_match = nil
+        true
+      elsif chord_action
+        # 完全マッチだが、より長い和音 ([E3,G3] に対する [E3,G3,B3] のように) の
+        # prefix にもなり得る。暫定マッチを保持してノート追加を待つ。
+        @pending_match = [chord_action, sorted]
+        true
+      elsif prefix_of_any_chord?(sorted)
+        # まだ確定しないが続行は可能
+        true
+      else
+        false
+      end
+    end
+
+    # 和音アクションを press する共通処理。LayerChange ならレイヤー切替、それ
+    # 以外なら active_chord に記録した上で press する。
+    def commit_chord_action(action, notes)
+      if action.is_a?(Action::LayerChange)
+        apply_layer_change(action, notes)
+      else
+        @active_chord_action = action
+        @active_chord_notes = notes
+        press_action(action)
+      end
+    end
+
+    # @pending を確定処理する。暫定マッチがあればそれを発火、なければ単音
+    # flush。どちらでも最後に @pending と @pending_match をクリアする。
+    def finalize_pending
+      match = @pending_match
+      if match
+        commit_chord_action(match[0], match[1])
+      else
+        flush_pending
+      end
+      @pending.clear
+      @pending_match = nil
     end
 
     # pending 内の全ノートを単体ノートとして発火する
@@ -325,6 +389,32 @@ class Scrimonia
           end
           return true if all_found
         end
+      end
+      false
+    end
+
+    # sorted_notes より厳密に長い和音の部分集合かを判定。完全マッチ済みの
+    # 和音が、さらに長い和音 ([E3,G3] に対する [E3,G3,B3] のような)
+    # の途中状態でもあるかを区別するために使う。
+    def prefix_of_longer_chord?(sorted_notes)
+      @chords.each do |entry|
+        chord_pairs = entry[0]
+        next unless sorted_notes.size < chord_pairs.size
+        all_found = true
+        sorted_notes.each do |n|
+          found = false
+          chord_pairs.each do |pair|
+            if pair[0] == n
+              found = true
+              break
+            end
+          end
+          unless found
+            all_found = false
+            break
+          end
+        end
+        return true if all_found
       end
       false
     end
