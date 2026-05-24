@@ -1,4 +1,4 @@
-MRuby::CrossBuild.new("midipico-cortex-m0plus") do |conf|
+MRuby::CrossBuild.new("scrimonia-cortex-m0plus") do |conf|
 
   conf.toolchain
 
@@ -42,6 +42,6 @@ MRuby::CrossBuild.new("midipico-cortex-m0plus") do |conf|
   conf.gem gemdir: '../gems/picoruby-pio-usb-midi'
   conf.gem gemdir: '../gems/picoruby-hid-keyboard'
   conf.gem gemdir: '../gems/picoruby-midi-output'
-  conf.gem gemdir: '../gems/picoruby-midi-pico'
+  conf.gem gemdir: '../gems/picoruby-scrimonia'
 
 end

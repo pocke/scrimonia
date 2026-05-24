@@ -1,5 +1,5 @@
 // HID Usage ID → 表示文字 の変換テーブル
-// ソース: gems/picoruby-midi-pico/mrblib/04_midi_pico_keycodes.rb
+// ソース: gems/picoruby-scrimonia/mrblib/04_scrimonia_keycodes.rb
 
 const HID_KEYCODE_TO_CHAR: Record<number, string> = {
   0x04: 'a', 0x05: 'b', 0x06: 'c', 0x07: 'd', 0x08: 'e',

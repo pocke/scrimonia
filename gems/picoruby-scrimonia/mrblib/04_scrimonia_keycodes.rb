@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   module Keycodes
     # HID Usage ID (USB HID Keyboard/Keypad Page 0x07)
     KC_A     = Action::Keycode.new(0x04)

@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   type layer_key = Note | Array[Note] | Integer
   type layer_value = Action::Keycode | Action::Modifier | Action::LayerChange | Action::MidiNote | Note
   type layer_mapping = Hash[layer_key, layer_value]

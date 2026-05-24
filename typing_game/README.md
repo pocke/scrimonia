@@ -1,8 +1,8 @@
-# MidiPico Typing Game
+# Scrimonia Typing Game
 
 MIDIキーボードでのタイピングを練習するための静的Webアプリ。
 
-MidiPico が MIDI 入力を HID キーボード入力に変換するので、ブラウザにはただのキーボード入力として届く。このアプリは keymap.rb を読み込んで「どの鍵盤がどの文字に対応するか」を把握し、タイピング練習を提供する。
+Scrimonia が MIDI 入力を HID キーボード入力に変換するので、ブラウザにはただのキーボード入力として届く。このアプリは keymap.rb を読み込んで「どの鍵盤がどの文字に対応するか」を把握し、タイピング練習を提供する。
 
 ## セットアップ
 
@@ -42,7 +42,7 @@ npm run build
 ## アーキテクチャ
 
 ```
-[MIDIキーボード] → [MidiPico (Pico)] → [HIDキーボード入力] → [ブラウザ タイピングゲーム]
+[MIDIキーボード] → [Scrimonia (Pico)] → [HIDキーボード入力] → [ブラウザ タイピングゲーム]
                                                                     ↑
                                                             keymap.rb アップロード
                                                             → PicoRuby.wasm でパース
@@ -53,6 +53,6 @@ npm run build
 
 PicoRuby.wasm を使って keymap.rb をブラウザ上で実行し、MIDI ノート → キーコードのマッピングデータを抽出する。
 
-- `gems/picoruby-midi-pico/mrblib/` の Ruby 定義（Note, Action, Notes, Keycodes）をブラウザ用スタブとして TypeScript 文字列で保持
-- `MidiPico#add_layer` でマッピングデータを収集し、`MidiPico#start!` で `JS.global` 経由で JavaScript に渡す
+- `gems/picoruby-scrimonia/mrblib/` の Ruby 定義（Note, Action, Notes, Keycodes）をブラウザ用スタブとして TypeScript 文字列で保持
+- `Scrimonia#add_layer` でマッピングデータを収集し、`Scrimonia#start!` で `JS.global` 経由で JavaScript に渡す
 - Vite が `@picoruby/wasm-wasi` の `picoruby.js` と `picoruby.wasm` を自動的にビルド出力に含める

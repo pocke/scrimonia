@@ -1,9 +1,9 @@
-require 'midi_pico'
+require 'scrimonia'
 
-include MidiPico::Notes
-include MidiPico::Keycodes
+include Scrimonia::Notes
+include Scrimonia::Keycodes
 
-mp = MidiPico.new
+mp = Scrimonia.new
 
 # ピアノ鍵盤を QWERTY US 配列風にマッピングする。
 # ベロシティで打ち分け: 弱打 = ホームロウ/トップロウ、強打 = ボトムロウ/数字ロウ
@@ -76,7 +76,7 @@ mp.add_layer :default, {
   [B3, C4] => KC_SPC,
 
   # C3+Cs3+D3 同時押しでパススルーレイヤーに切り替え
-  [C3, Cs3, D3] => MidiPico::Action::LayerChange.new(:passthrough, :switch),
+  [C3, Cs3, D3] => Scrimonia::Action::LayerChange.new(:passthrough, :switch),
 }
 
 # パススルーレイヤー: 全ノートを MIDI としてそのまま出力する
@@ -84,12 +84,12 @@ passthrough_mapping = {}
 # C2 (36) ~ B6 (95) の全ノートをパススルー
 note_number = 36
 while note_number <= 95
-  n = MidiPico::Note.new(note_number)
+  n = Scrimonia::Note.new(note_number)
   passthrough_mapping[n] = n
   note_number += 1
 end
 # C3+Cs3+D3 同時押しで default レイヤーに戻る
-passthrough_mapping[[C3, Cs3, D3]] = MidiPico::Action::LayerChange.new(:default, :switch)
+passthrough_mapping[[C3, Cs3, D3]] = Scrimonia::Action::LayerChange.new(:default, :switch)
 
 mp.add_layer :passthrough, passthrough_mapping
 

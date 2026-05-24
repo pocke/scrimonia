@@ -3,7 +3,7 @@ require 'pio_usb_midi'
 require 'hid_keyboard'
 require 'midi_output'
 
-class MidiPico
+class Scrimonia
   def initialize
     @layer_definitions = []
   end

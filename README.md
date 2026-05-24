@@ -1,7 +1,11 @@
-# midipico
+# Scrimonia
 
 USB MIDIキーボードを文字入力キーボードとして使うための変換装置。
 Raspberry Pi Pico と PicoRuby で実装する。
+
+読み方: スクリモニア (IPA: /skriˈmɔːnja/)
+
+イタリア語の *scrivere* (書く) と *armonia* (和音) から。
 
 ## 概要
 
@@ -89,7 +93,7 @@ D+ に外部プルアップ抵抗は不要。USB Host は D+/D- にプルダウ�
 
 ## タイピングゲーム (`typing_game/`)
 
-MidiPico 用のタイピング練習 Web アプリケーション。
+Scrimonia 用のタイピング練習 Web アプリケーション。
 
 ユーザーの `keymap.rb` をブラウザ上で読み込み、MIDI キーボードでのタイピング練習ができる。
 

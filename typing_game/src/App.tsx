@@ -7,7 +7,7 @@ import { TypingGame, type GameMode } from './components/TypingGame'
 import { FreePlayMode } from './components/FreePlayMode'
 import { SettingsModal } from './components/SettingsModal'
 import { DeviceConsole, type DeviceLogLine } from './components/DeviceConsole'
-import { MidiPicoSerial } from './lib/webSerial'
+import { ScrimoniaSerial } from './lib/webSerial'
 import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
 
@@ -15,8 +15,8 @@ type AppMode = GameMode | 'free'
 
 const MAX_LOG_LINES = 200
 
-const KEYMAP_STORAGE_KEY = 'midipico-keymap-data'
-const RAW_KEYMAP_STORAGE_KEY = 'midipico-raw-keymap'
+const KEYMAP_STORAGE_KEY = 'scrimonia-keymap-data'
+const RAW_KEYMAP_STORAGE_KEY = 'scrimonia-raw-keymap'
 
 function loadKeymapFromStorage(): KeymapData | null {
   try {
@@ -41,7 +41,7 @@ function App() {
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
 
-  const [serial] = useState(() => new MidiPicoSerial())
+  const [serial] = useState(() => new ScrimoniaSerial())
   const [serialConnected, setSerialConnected] = useState(false)
   useEffect(() => () => { void serial.disconnect() }, [serial])
   const [deviceLines, setDeviceLines] = useState<DeviceLogLine[]>([])
@@ -83,7 +83,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="border-b border-gray-700 p-4">
-        <h1 className="text-2xl font-bold">MidiPico Typing Game</h1>
+        <h1 className="text-2xl font-bold">Scrimonia Typing Game</h1>
       </header>
       <main className="max-w-5xl mx-auto p-8 space-y-8">
         {!keymap && <KeymapUploader onKeymapParsed={handleKeymapParsed} />}

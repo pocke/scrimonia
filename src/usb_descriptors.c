@@ -74,12 +74,12 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
 /* String Descriptors */
 static char const *string_desc_arr[] = {
   (const char[]){0x09, 0x04},  /* English */
-  "midipico",                   /* Manufacturer */
-  "midipico",                   /* Product */
+  "scrimonia",                   /* Manufacturer */
+  "scrimonia",                   /* Product */
   "000001",                     /* Serial */
-  "midipico CDC",               /* CDC Interface */
-  "midipico Keyboard",          /* HID Keyboard Interface */
-  "midipico MIDI",              /* MIDI Interface */
+  "scrimonia CDC",               /* CDC Interface */
+  "scrimonia Keyboard",          /* HID Keyboard Interface */
+  "scrimonia MIDI",              /* MIDI Interface */
 };
 
 static uint16_t _desc_str[32];

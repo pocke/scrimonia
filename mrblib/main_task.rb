@@ -1,7 +1,7 @@
 require 'littlefs'
 require 'vfs'
 require 'sandbox'
-require 'midi_pico'
+require 'scrimonia'
 
 KEYMAP_PATH = "/keymap.rb"
 

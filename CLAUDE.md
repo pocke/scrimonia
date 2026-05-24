@@ -17,7 +17,7 @@ git submodule の初期化と依存ライブラリのインストールを行う
 rake all
 ```
 
-以下の3ステージを順に実行し、`build/midipico.uf2` を生成する:
+以下の3ステージを順に実行し、`build/scrimonia.uf2` を生成する:
 1. `rake libmruby` — PicoRuby (mruby/c VM + gem) を ARM Cortex-M0+ 向けにクロスコンパイルして libmruby.a を生成
 2. `rake cmake` — pico-sdk / pico-extras を使い CMake ビルドシステムを生成
 3. `rake build` — C ソースと libmruby.a をリンクして .uf2 ファームウェアを生成

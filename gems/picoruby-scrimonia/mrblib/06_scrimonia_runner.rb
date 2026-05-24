@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   class Runner
     CHORD_TIMEOUT_MS = 50
 

@@ -16,7 +16,7 @@ include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
 # build_config/ 下の .rb ファイル名と対応。libmruby のビルド出力パスに使う。
-set(BUILD_CONFIG midipico-cortex-m0plus)
+set(BUILD_CONFIG scrimonia-cortex-m0plus)
 set(PICORUBY_ROOT ${CMAKE_SOURCE_DIR}/lib/picoruby)
 set(PICO_PIO_USB_ROOT ${CMAKE_SOURCE_DIR}/lib/Pico-PIO-USB)
 set(PICO_TINYUSB_PATH ${PICORUBY_ROOT}/mrbgems/picoruby-r2p2/lib/pico-sdk/lib/tinyusb)
@@ -29,7 +29,7 @@ add_compile_definitions(
   PIO_USB_USE_TINYUSB=1
 )
 
-project(midipico C CXX ASM)
+project(scrimonia C CXX ASM)
 
 pico_sdk_init()
 

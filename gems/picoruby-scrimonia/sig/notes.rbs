@@ -1,4 +1,4 @@
-class MidiPico
+class Scrimonia
   module Notes
     C2: Note
     Cs2: Note
