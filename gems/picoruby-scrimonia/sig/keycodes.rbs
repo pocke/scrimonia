@@ -1,5 +1,5 @@
 class Scrimonia
-  module Keycodes
+  module Keycodes : BasicObject
     # アルファベット
     KC_A: Action::Keycode
     KC_B: Action::Keycode

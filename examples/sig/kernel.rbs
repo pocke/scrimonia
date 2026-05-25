@@ -1,0 +1,4 @@
+module Kernel
+  include Scrimonia::Notes
+  include Scrimonia::Keycodes
+end

@@ -1,7 +1,7 @@
 require 'scrimonia'
 
-include Scrimonia::Notes
-include Scrimonia::Keycodes
+include Scrimonia::Notes # steep:ignore NoMethod
+include Scrimonia::Keycodes # steep:ignore NoMethod
 
 mp = Scrimonia.new
 
@@ -137,7 +137,7 @@ mp.add_layer :chord, {
 }
 
 # パススルーレイヤー: 全ノートを MIDI としてそのまま出力する
-passthrough_mapping = {}
+passthrough_mapping = {} #: Hash[Scrimonia::layer_key, Scrimonia::layer_value]
 # C2 (36) ~ B6 (95) の全ノートをパススルー
 note_number = 36
 while note_number <= 95

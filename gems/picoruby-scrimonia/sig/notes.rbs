@@ -1,5 +1,5 @@
 class Scrimonia
-  module Notes
+  module Notes : BasicObject
     C2: Note
     Cs2: Note
     D2: Note
