@@ -12,8 +12,8 @@ mp = Scrimonia.new
 #   黒鍵: Cs3 Ds3    Fs3 Gs3 As3  Cs4 Ds4    Fs4 Gs4 As4
 #   白鍵:    E3  F3  G3  A3  B3  C4  D4  E4  F4  G4
 
-soft = 1..60
-hard = 61..127
+soft = 1..70
+hard = 71..127
 
 mp.add_layer :default, {
   # --- 弱打 (velocity 1..60) ---
@@ -69,12 +69,14 @@ mp.add_layer :default, {
   As4.with(velocity: hard) => KC_0,
 
   # Modifiers
-  C3 => KC_LCTL,
-  D3 => KC_LALT,
+  C3.with(velocity: soft) => KC_LCTL,
+  C3.with(velocity: hard) => KC_LALT,
+  D3 => KC_LSFT,
 
   [D4, E4] => KC_ESC,
   [B3, C4] => KC_SPC,
-  C5 => KC_ENTER,
+  C5.with(velocity: soft) => KC_BSPC,
+  C5.with(velocity: hard) => KC_ENTER,
 
   # C3+Cs3+D3 同時押しで chord (ダイアトニックコード) レイヤーに切り替え。
   # 3レイヤーは default -> chord -> passthrough -> default のループ。
