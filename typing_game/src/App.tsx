@@ -47,8 +47,13 @@ function App() {
   // 文字入力アクション (= HID キーボード入力) では Web MIDI には来ないので、
   // こちらの経路でも打鍵フィードバックを集計する必要がある。
   const [serialActiveNotes, setSerialActiveNotes] = useState<number[]>([])
+  // タイピング判定で「不正解」と認定された押下中ノート。NOTE_OFF が届くまで
+  // 維持し続けることで「押した瞬間は緑だがすぐ赤に変わる」のような flicker を
+  // 避けつつ「押している間は判定結果を保持する」UX にする。
+  const [wrongNotes, setWrongNotes] = useState<number[]>([])
   const lineIdRef = useRef(0)
   const serialActiveSetRef = useRef<Set<number>>(new Set())
+  const wrongNotesSetRef = useRef<Set<number>>(new Set())
 
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
@@ -60,7 +65,26 @@ function App() {
     setSerialConnected(connected)
     if (!connected) {
       serialActiveSetRef.current.clear()
+      wrongNotesSetRef.current.clear()
       setSerialActiveNotes([])
+      setWrongNotes([])
+    }
+  }, [])
+
+  // タイピング側で「期待文字と違うキーが入った」と判定されたら、現在押下中の
+  // ノートをすべて wrong とみなす。文字とノートの厳密な対応 (velocity 条件
+  // 付きキーマップで弱打/強打を区別するなど) を知らなくても、和音以外の単音
+  // 演奏なら正しいノートに赤がつく。
+  const handleWrongTypingInput = useCallback(() => {
+    let changed = false
+    for (const note of serialActiveSetRef.current) {
+      if (!wrongNotesSetRef.current.has(note)) {
+        wrongNotesSetRef.current.add(note)
+        changed = true
+      }
+    }
+    if (changed) {
+      setWrongNotes(Array.from(wrongNotesSetRef.current))
     }
   }, [])
 
@@ -84,6 +108,9 @@ function App() {
       if (serialActiveSetRef.current.delete(msg.note)) {
         setSerialActiveNotes(Array.from(serialActiveSetRef.current))
       }
+      if (wrongNotesSetRef.current.delete(msg.note)) {
+        setWrongNotes(Array.from(wrongNotesSetRef.current))
+      }
     }
   }, [])
 
@@ -93,19 +120,6 @@ function App() {
     : serialActiveNotes.length === 0
     ? midiActiveNotes
     : Array.from(new Set([...midiActiveNotes, ...serialActiveNotes]))
-
-  // タイピング中はヒントに含まれないノートを「ミスタッチ」とみなして赤で表す。
-  // ヒントが空 (= 期待入力なし、例えば自由演奏中) のときは全て正解扱いで緑にする。
-  let activeRightNotes = allActiveNotes
-  const activeWrongNotes: number[] = []
-  if (typingHighlightNotes && typingHighlightNotes.length > 0 && allActiveNotes.length > 0) {
-    const hintSet = new Set(typingHighlightNotes)
-    activeRightNotes = []
-    for (const note of allActiveNotes) {
-      if (hintSet.has(note)) activeRightNotes.push(note)
-      else activeWrongNotes.push(note)
-    }
-  }
 
   const activeLayer = keymap
     ? (keymap[activeLayerName] ?? keymap['default'] ?? Object.values(keymap)[0])
@@ -177,9 +191,9 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={activeRightNotes} wrongNotes={activeWrongNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={allActiveNotes} wrongNotes={wrongNotes} />
             <MidiStatusView status={midiStatus} />
-            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
+            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
           </>
         )}
