@@ -142,8 +142,8 @@ mp.add_layer :chord, {
 # パススルーレイヤー: 全ノートを MIDI としてそのまま出力する
 passthrough_mapping = {} #: Hash[Scrimonia::layer_key, Scrimonia::layer_value]
 # C2 (36) ~ B6 (95) の全ノートをパススルー
-note_number = 36
-while note_number <= 95
+note_number = 48
+while note_number <= 72
   n = Scrimonia::Note.new(note_number)
   passthrough_mapping[n] = n
   note_number += 1
