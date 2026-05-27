@@ -46,7 +46,8 @@ function App() {
   const lineIdRef = useRef(0)
 
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
-  const midiStatus = useMidiInput()
+  // activeNotes は現在押下中のノート (打鍵フィードバック用)。
+  const { status: midiStatus, activeNotes: midiActiveNotes } = useMidiInput()
 
   const handleDeviceLine = useCallback((line: string) => {
     setDeviceLines(prev => {
@@ -132,7 +133,7 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={midiActiveNotes} />
             <MidiStatusView status={midiStatus} />
             <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
