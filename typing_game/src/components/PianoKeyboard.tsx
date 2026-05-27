@@ -13,10 +13,15 @@ import {
 
 interface Props {
   keymap: LayerKeymap
+  /** タイピングのヒント (= 次に押すべき鍵) として青系でハイライトするノート。 */
   highlightNotes?: number[]
+  /** 現在押下中で正しい (ヒントに含まれる) ノート。緑系でハイライトする。 */
+  activeNotes?: number[]
+  /** 現在押下中だがヒントに含まれない誤打鍵。赤系でハイライトする。 */
+  wrongNotes?: number[]
 }
 
-export function PianoKeyboard({ keymap, highlightNotes }: Props) {
+export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes }: Props) {
   if (keymap.length === 0) return null
 
   const allNoteNumbers = keymap.flatMap(e => e.noteNumbers)
@@ -30,6 +35,8 @@ export function PianoKeyboard({ keymap, highlightNotes }: Props) {
   const svgHeight = WHITE_KEY_HEIGHT + 30
 
   const highlightSet = new Set(highlightNotes ?? [])
+  const activeSet = new Set(activeNotes ?? [])
+  const wrongSet = new Set(wrongNotes ?? [])
 
   // ノート番号ごとのマッピングを構築（和音エントリは各ノートに登録）
   const noteMap = new Map<number, KeymapEntry[]>()
@@ -62,12 +69,16 @@ export function PianoKeyboard({ keymap, highlightNotes }: Props) {
       {/* 白鍵 */}
       {whiteKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
+        const isWrong = wrongSet.has(key.noteNumber)
+        const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
         const isModifier = entries?.some(e => e.type === 'modifier')
         const hasMappings = entries && entries.length > 0
 
         let fill = '#f8f8f8'
-        if (isHighlighted) fill = '#93c5fd'
+        if (isWrong) fill = '#fca5a5'
+        else if (isActive) fill = '#86efac'
+        else if (isHighlighted) fill = '#93c5fd'
         else if (isModifier) fill = '#fed7aa'
         else if (hasMappings) fill = '#ffffff'
 
@@ -96,12 +107,16 @@ export function PianoKeyboard({ keymap, highlightNotes }: Props) {
       {/* 黒鍵（白鍵の上に描画） */}
       {blackKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
+        const isWrong = wrongSet.has(key.noteNumber)
+        const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
         const isModifier = entries?.some(e => e.type === 'modifier')
         const hasMappings = entries && entries.length > 0
 
         let fill = '#1f2937'
-        if (isHighlighted) fill = '#3b82f6'
+        if (isWrong) fill = '#dc2626'
+        else if (isActive) fill = '#16a34a'
+        else if (isHighlighted) fill = '#3b82f6'
         else if (isModifier) fill = '#c2410c'
         else if (hasMappings) fill = '#111827'
 
