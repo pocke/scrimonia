@@ -94,6 +94,19 @@ function App() {
     ? midiActiveNotes
     : Array.from(new Set([...midiActiveNotes, ...serialActiveNotes]))
 
+  // タイピング中はヒントに含まれないノートを「ミスタッチ」とみなして赤で表す。
+  // ヒントが空 (= 期待入力なし、例えば自由演奏中) のときは全て正解扱いで緑にする。
+  let activeRightNotes = allActiveNotes
+  const activeWrongNotes: number[] = []
+  if (typingHighlightNotes && typingHighlightNotes.length > 0 && allActiveNotes.length > 0) {
+    const hintSet = new Set(typingHighlightNotes)
+    activeRightNotes = []
+    for (const note of allActiveNotes) {
+      if (hintSet.has(note)) activeRightNotes.push(note)
+      else activeWrongNotes.push(note)
+    }
+  }
+
   const activeLayer = keymap
     ? (keymap[activeLayerName] ?? keymap['default'] ?? Object.values(keymap)[0])
     : null
@@ -164,7 +177,7 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={allActiveNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={activeRightNotes} wrongNotes={activeWrongNotes} />
             <MidiStatusView status={midiStatus} />
             <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
