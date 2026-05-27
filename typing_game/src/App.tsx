@@ -43,11 +43,26 @@ function App() {
   useEffect(() => () => { void serial.disconnect() }, [serial])
   const [deviceLines, setDeviceLines] = useState<DeviceLogLine[]>([])
   const [activeLayerName, setActiveLayerName] = useState<string>('default')
+  // WebSerial 経由でデバイスから届く note_on/note_off に基づく押下中ノート。
+  // 文字入力アクション (= HID キーボード入力) では Web MIDI には来ないので、
+  // こちらの経路でも打鍵フィードバックを集計する必要がある。
+  const [serialActiveNotes, setSerialActiveNotes] = useState<number[]>([])
   const lineIdRef = useRef(0)
+  const serialActiveSetRef = useRef<Set<number>>(new Set())
 
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
-  // activeNotes は現在押下中のノート (打鍵フィードバック用)。
+  // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
   const { status: midiStatus, activeNotes: midiActiveNotes } = useMidiInput()
+
+  // 接続状態の変更点で WebSerial の押下中ノートも掃除する。切断後は note_off
+  // が届かないので、放置すると鍵盤が光ったままになる。
+  const handleSerialConnectedChange = useCallback((connected: boolean) => {
+    setSerialConnected(connected)
+    if (!connected) {
+      serialActiveSetRef.current.clear()
+      setSerialActiveNotes([])
+    }
+  }, [])
 
   const handleDeviceLine = useCallback((line: string) => {
     setDeviceLines(prev => {
@@ -60,8 +75,24 @@ function App() {
     const msg = parseDeviceMessage(line)
     if (msg?.type === 'layer_change') {
       setActiveLayerName(msg.layer)
+    } else if (msg?.type === 'note_on') {
+      if (!serialActiveSetRef.current.has(msg.note)) {
+        serialActiveSetRef.current.add(msg.note)
+        setSerialActiveNotes(Array.from(serialActiveSetRef.current))
+      }
+    } else if (msg?.type === 'note_off') {
+      if (serialActiveSetRef.current.delete(msg.note)) {
+        setSerialActiveNotes(Array.from(serialActiveSetRef.current))
+      }
     }
   }, [])
+
+  // Web MIDI と WebSerial の両経路の押下中ノートを和集合で扱う。
+  const allActiveNotes = midiActiveNotes.length === 0
+    ? serialActiveNotes
+    : serialActiveNotes.length === 0
+    ? midiActiveNotes
+    : Array.from(new Set([...midiActiveNotes, ...serialActiveNotes]))
 
   const activeLayer = keymap
     ? (keymap[activeLayerName] ?? keymap['default'] ?? Object.values(keymap)[0])
@@ -128,12 +159,12 @@ function App() {
                   rawKeymap={rawKeymap}
                   serial={serial}
                   connected={serialConnected}
-                  setConnected={setSerialConnected}
+                  setConnected={handleSerialConnectedChange}
                   onLine={handleDeviceLine}
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={midiActiveNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={allActiveNotes} />
             <MidiStatusView status={midiStatus} />
             <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
