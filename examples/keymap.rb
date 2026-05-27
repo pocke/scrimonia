@@ -74,6 +74,7 @@ mp.add_layer :default, {
 
   [D4, E4] => KC_ESC,
   [B3, C4] => KC_SPC,
+  C5 => KC_ENTER,
 
   # C3+Cs3+D3 同時押しで chord (ダイアトニックコード) レイヤーに切り替え。
   # 3レイヤーは default -> chord -> passthrough -> default のループ。
