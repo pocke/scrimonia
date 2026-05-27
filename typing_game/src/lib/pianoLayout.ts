@@ -17,6 +17,11 @@ export const WHITE_KEY_HEIGHT = 160
 export const BLACK_KEY_WIDTH = 26
 export const BLACK_KEY_HEIGHT = 100
 
+// デフォルトの表示範囲: C3 (MIDI 48) から C5 (MIDI 72) の 25 鍵盤。
+// 一般的な 25 鍵 MIDI キーボードと同じ範囲。
+export const DEFAULT_MIN_NOTE = 48
+export const DEFAULT_MAX_NOTE = 72
+
 // 白鍵の形状タイプ: 黒鍵に隣接するノッチの位置
 type WhiteKeyShape = 'left' | 'right' | 'both' | 'full'
 
@@ -32,12 +37,21 @@ export interface KeyLayout {
 
 /**
  * 指定されたノート範囲のピアノ鍵盤レイアウトを計算する。
- * 範囲はオクターブ境界（C）に切り上げ/切り下げされる。
+ *
+ * デフォルトでは C3〜C5 の 25 鍵盤を表示する。指定された範囲がこれに収まる
+ * 場合は固定で 25 鍵を返す。収まらない場合はオクターブ境界 (C〜B) に
+ * 切り上げ/切り下げて拡張する。
  */
 export function buildKeyboardLayout(minNote: number, maxNote: number): KeyLayout[] {
-  // オクターブ境界に拡張: 最小を直前の C に、最大を直後の B に
-  const startNote = minNote - (minNote % 12)
-  const endNote = maxNote + (11 - (maxNote % 12))
+  let startNote: number
+  let endNote: number
+  if (minNote >= DEFAULT_MIN_NOTE && maxNote <= DEFAULT_MAX_NOTE) {
+    startNote = DEFAULT_MIN_NOTE
+    endNote = DEFAULT_MAX_NOTE
+  } else {
+    startNote = minNote - (minNote % 12)
+    endNote = maxNote + (11 - (maxNote % 12))
+  }
 
   const layouts: KeyLayout[] = []
 
@@ -57,13 +71,19 @@ export function buildKeyboardLayout(minNote: number, maxNote: number): KeyLayout
       // オクターブ境界でない C の場合も right
       const shape = WHITE_KEY_SHAPES[whiteKeyIndex]
 
-      // 端のキーはノッチ不要な場合がある
+      // 端のキーはノッチ不要な場合がある。endNote が C のケース
+      // (25 鍵デフォルトで起こる) は元実装に無かったため、'right' を 'full'
+      // に倒すパターンを追加している。
       let actualShape = shape
       if (note === startNote) {
         actualShape = shape === 'both' ? 'left' : shape === 'right' ? 'full' : shape
       }
       if (note === endNote) {
-        actualShape = shape === 'both' ? 'right' : shape === 'left' ? 'full' : shape
+        actualShape =
+          shape === 'both' ? 'right'
+          : shape === 'left' ? 'full'
+          : shape === 'right' ? 'full'
+          : shape
       }
 
       layouts.push({
