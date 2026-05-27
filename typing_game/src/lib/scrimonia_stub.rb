@@ -36,6 +36,10 @@ class Scrimonia
           entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
         elsif value.is_a?(Action::Modifier)
           entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
+        elsif value.is_a?(Note)
+          # MIDI パススルー (例: passthrough_mapping[n] = n)。
+          # hidCode フィールドに出力 MIDI ノート番号を流用する。
+          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
         end
       elsif key.is_a?(Note)
         note_numbers = [key.number]
@@ -50,6 +54,8 @@ class Scrimonia
           entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
         elsif value.is_a?(Action::Modifier)
           entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
+        elsif value.is_a?(Note)
+          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
         end
       end
     end
