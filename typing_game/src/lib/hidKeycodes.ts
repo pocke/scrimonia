@@ -31,9 +31,20 @@ const HID_MODIFIER_TO_NAME: Record<number, string> = {
   0x10: 'RCtrl', 0x20: 'RShift', 0x40: 'RAlt', 0x80: 'RGUI',
 }
 
-export function hidCodeToChar(hidCode: number, type: 'keycode' | 'modifier'): string {
+// Scrimonia::Note::NOTE_NAMES と同じ並び。
+const NOTE_NAMES = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B']
+
+function noteNumberToName(noteNumber: number): string {
+  const octave = Math.floor(noteNumber / 12) - 1
+  return `${NOTE_NAMES[noteNumber % 12]}${octave}`
+}
+
+export function hidCodeToChar(hidCode: number, type: 'keycode' | 'modifier' | 'midi'): string {
   if (type === 'modifier') {
     return HID_MODIFIER_TO_NAME[hidCode] ?? `Mod(0x${hidCode.toString(16)})`
+  }
+  if (type === 'midi') {
+    return noteNumberToName(hidCode)
   }
   return HID_KEYCODE_TO_CHAR[hidCode] ?? `0x${hidCode.toString(16)}`
 }
