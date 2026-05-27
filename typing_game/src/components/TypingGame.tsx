@@ -17,6 +17,8 @@ export type GameMode = 'en' | 'ja'
 interface Props {
   keymap: LayerKeymap
   onHighlightChange: (noteNumbers: number[] | undefined) => void
+  /** 期待文字と一致するキー入力があったときに呼ばれる。鍵盤を緑にするための通知。 */
+  onRightInput?: () => void
   /** 期待文字と一致しないキー入力があったときに呼ばれる。鍵盤を赤くするための通知。 */
   onWrongInput?: () => void
   mode: GameMode
@@ -96,7 +98,7 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, romajiPreferences }: Props) {
+export function TypingGame({ keymap, onHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
@@ -176,6 +178,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
         if (prev.status === 'idle') {
           if (key === target) {
             const next = prev.currentIndex + 1
+            onRightInput?.()
             return {
               ...prev,
               status: next >= prev.targetText.length ? 'finished' : 'playing',
@@ -190,6 +193,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
 
         if (key === target) {
           const next = prev.currentIndex + 1
+          onRightInput?.()
           return {
             ...prev,
             status: next >= prev.targetText.length ? 'finished' : prev.status,
@@ -209,6 +213,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
 
         switch (result.type) {
           case 'pending':
+            onRightInput?.()
             return {
               ...prev,
               status: prev.status === 'idle' ? 'playing' : prev.status,
@@ -216,6 +221,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
               romajiState: result.nextState,
             }
           case 'advance':
+            onRightInput?.()
             return {
               ...prev,
               status: prev.status === 'idle' ? 'playing' : prev.status,
@@ -224,6 +230,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
               romajiState: result.nextState,
             }
           case 'complete':
+            onRightInput?.()
             return {
               ...prev,
               status: 'finished',
@@ -242,7 +249,7 @@ export function TypingGame({ keymap, onHighlightChange, onWrongInput, mode, roma
         }
       })
     }
-  }, [game.status, game.mode, triggerShake, onWrongInput])
+  }, [game.status, game.mode, triggerShake, onRightInput, onWrongInput])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
