@@ -4,14 +4,12 @@ import { KeymapUploader } from './components/KeymapUploader'
 import { KeymapSender } from './components/KeymapSender'
 import { PianoKeyboard } from './components/PianoKeyboard'
 import { TypingGame, type GameMode } from './components/TypingGame'
-import { FreePlayMode } from './components/FreePlayMode'
 import { SettingsModal } from './components/SettingsModal'
 import { DeviceConsole, type DeviceLogLine } from './components/DeviceConsole'
 import { ScrimoniaSerial } from './lib/webSerial'
 import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
-
-type AppMode = GameMode | 'free'
+import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
 
 const MAX_LOG_LINES = 200
 
@@ -36,8 +34,7 @@ function App() {
   const [keymap, setKeymap] = useState<KeymapData | null>(loadKeymapFromStorage)
   const [rawKeymap, setRawKeymap] = useState<string | null>(() => localStorage.getItem(RAW_KEYMAP_STORAGE_KEY))
   const [typingHighlightNotes, setTypingHighlightNotes] = useState<number[] | undefined>()
-  const [midiActiveNotes, setMidiActiveNotes] = useState<number[]>([])
-  const [appMode, setAppMode] = useState<AppMode>('en')
+  const [appMode, setAppMode] = useState<GameMode>('en')
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -47,6 +44,9 @@ function App() {
   const [deviceLines, setDeviceLines] = useState<DeviceLogLine[]>([])
   const [activeLayerName, setActiveLayerName] = useState<string>('default')
   const lineIdRef = useRef(0)
+
+  // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
+  const midiStatus = useMidiInput()
 
   const handleDeviceLine = useCallback((line: string) => {
     setDeviceLines(prev => {
@@ -61,8 +61,6 @@ function App() {
       setActiveLayerName(msg.layer)
     }
   }, [])
-
-  const highlightNotes = appMode === 'free' ? midiActiveNotes : typingHighlightNotes
 
   const activeLayer = keymap
     ? (keymap[activeLayerName] ?? keymap['default'] ?? Object.values(keymap)[0])
@@ -111,16 +109,6 @@ function App() {
                 ローマ字モード
               </button>
               <button
-                onClick={() => setAppMode('free')}
-                className={`px-4 py-2 rounded text-sm ${
-                  appMode === 'free'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                自由演奏モード
-              </button>
-              <button
                 onClick={() => setShowSettings(true)}
                 className="p-2 rounded text-gray-400 hover:text-white hover:bg-gray-700"
                 title="設定"
@@ -144,12 +132,9 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={highlightNotes} />
-            {appMode === 'free' ? (
-              <FreePlayMode onActiveNotesChange={setMidiActiveNotes} />
-            ) : (
-              <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
-            )}
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} />
+            <MidiStatusView status={midiStatus} />
+            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
           </>
         )}
@@ -165,6 +150,37 @@ function App() {
       )}
     </div>
   )
+}
+
+function MidiStatusView({ status }: { status: MidiConnectionStatus }) {
+  switch (status.kind) {
+    case 'unsupported':
+      return (
+        <p className="text-xs text-red-400">
+          MIDI 入力は Chrome / Edge / Opera などの Web MIDI API 対応ブラウザでのみ動作します
+        </p>
+      )
+    case 'requesting':
+      return null
+    case 'denied':
+      return (
+        <p className="text-xs text-red-400">
+          MIDI へのアクセスが拒否されました: {status.message}
+        </p>
+      )
+    case 'no-device':
+      return (
+        <p className="text-xs text-yellow-400">
+          MIDI デバイスが接続されていません
+        </p>
+      )
+    case 'connected':
+      return (
+        <p className="text-xs text-gray-400">
+          MIDI 接続中: <span className="text-gray-200">{status.deviceNames.join(', ')}</span>
+        </p>
+      )
+  }
 }
 
 export default App
