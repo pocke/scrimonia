@@ -14,4 +14,7 @@ class RunMacroTest < Picotest::Test
   def test_restores_modifier_state_after_sending: () -> void
   def test_aborts_and_flags_release_when_a_report_never_goes_out: () -> void
   def test_does_not_flag_release_when_everything_goes_out: () -> void
+  def test_retries_until_the_endpoint_accepts_the_report: () -> void
+  def test_reports_the_triggering_note_and_count_when_finished: () -> void
+  def test_counts_a_character_whose_press_went_out_before_aborting: () -> void
 end

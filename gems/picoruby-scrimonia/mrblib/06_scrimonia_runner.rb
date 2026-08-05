@@ -176,7 +176,6 @@ class Scrimonia
     # 必ず1文字ごとに対で送る。
     def run_macro(macro, note)
       text = macro.text
-      total = 0
       sent = 0
       i = 0
       while i < text.bytesize
@@ -185,7 +184,6 @@ class Scrimonia
         code = byte && Action::Macro.hid_code_for(byte)
         next unless code
 
-        total += 1
         modifier = (code & Action::Macro::SHIFT) > 0 ? MACRO_SHIFT_MODIFIER : 0
         unless send_hid_with_retry { HidKeyboard.press(code & Action::Macro::KEYCODE_MASK, modifier) }
           abort_macro(note, sent)
@@ -201,7 +199,7 @@ class Scrimonia
       # マクロは @modifier_state を載せずに送るため、押下中の修飾キーの状態を
       # ホストへ送り直す。
       send_hid_release
-      print "{\"type\":\"macro_sent\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{total}}\r\n"
+      print "{\"type\":\"macro_sent\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{sent}}\r\n"
     end
 
     # 送信できないうちは MACRO_REPORT_TIMEOUT_MS までリトライする。ホスト未接続や

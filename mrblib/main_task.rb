@@ -49,15 +49,17 @@ ticks = 0
 
 # メインループ: キーマップ受信を監視し、受信完了時にリロードする。
 loop do
-  # mruby/c は vm->exception を return / break / ensure の巻き戻しにも使い回すため、
-  # 実行中のタスクを見ると未捕捉例外でなくても非 nil が返る。DORMANT まで待つ。
   if sandbox && !keymap_error && sandbox.state == :DORMANT
-    err = sandbox.error
-    keymap_error = err ? "#{err.class}: #{err.message}" : "keymap task stopped"
+    keymap_error = "the keymap stopped"
+    ticks = 0
+    # Sandbox の解放が mrbc_vm_end を呼び、未捕捉例外の内容を出力する。
+    # Sandbox#error で読むと、mruby/c 側が incref せずに例外を返すため
+    # 参照カウントが早く 0 になり、この解放時に二重 free になる。
+    sandbox = nil
   end
 
   if keymap_error && ticks % ERROR_REPRINT_INTERVAL == 0
-    print "Keymap error: #{keymap_error}\r\n"
+    print "Keymap error: #{keymap_error}. Fix keymap.rb and upload it again.\r\n"
   end
 
   if receiver.poll
@@ -66,6 +68,7 @@ loop do
     # 現状は Sandbox を新規作成してキーマップをロードする。
     sandbox = Sandbox.new or raise
     keymap_error = load_keymap(sandbox, KEYMAP_PATH)
+    ticks = 0
     print "Keymap reloaded.\r\n"
   end
   ticks += 1

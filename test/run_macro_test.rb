@@ -63,4 +63,25 @@ class RunMacroTest < Picotest::Test
     run_macro("abc")
     assert_false @runner.instance_variable_get(:@release_pending)
   end
+
+  # 一時的に送れないだけならリトライして完走する
+  def test_retries_until_the_endpoint_accepts_the_report
+    HidKeyboard.reset(nil, 2)
+    run_macro("a")
+    assert_equal [[:press, 0x04, 0], [:release], [:release]], HidKeyboard.reports
+  end
+
+  def test_reports_the_triggering_note_and_count_when_finished
+    run_macro("ab")
+    assert_equal "{\"type\":\"macro_sent\",\"note\":60,\"name\":\"C4\",\"sent\":2}\r\n",
+      $printed[-1]
+  end
+
+  # 打鍵はホストに届いているので、release で落ちた文字も sent に数える
+  def test_counts_a_character_whose_press_went_out_before_aborting
+    HidKeyboard.reset(3)
+    run_macro("abc")
+    assert_equal "{\"type\":\"macro_aborted\",\"note\":60,\"name\":\"C4\",\"sent\":2}\r\n",
+      $printed[-1]
+  end
 end
