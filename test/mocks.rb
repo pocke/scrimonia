@@ -64,7 +64,13 @@ module Machine
   end
 end
 
-def print(*args)
-  args.each { |a| $printed << a.to_s }
-  nil
+# トップレベルに置くと picotest 自身の進捗出力まで飲み込むため、Runner の
+# インスタンスメソッドとして定義して捕捉対象を Runner の出力だけに絞る。
+class Scrimonia
+  class Runner
+    def print(*args)
+      args.each { |a| $printed << a.to_s }
+      nil
+    end
+  end
 end

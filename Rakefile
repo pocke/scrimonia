@@ -9,12 +9,13 @@ PICORUBY_BIN = "lib/picoruby/build/host/bin/femtoruby"
 PICOTEST_PATH = "lib/picoruby/mrbgems/picoruby-picotest/mrblib/picotest.rb"
 
 # 04 の KC_* が 02 の Action::Keycode を、06 が 01 の Note を参照するため、依存順に並べる。
+# mocks は Runner を再オープンするので最後に置く。
 TEST_LOAD_FILES = %w[
-  test/mocks.rb
   gems/picoruby-scrimonia/mrblib/01_scrimonia_note.rb
   gems/picoruby-scrimonia/mrblib/02_scrimonia_action.rb
   gems/picoruby-scrimonia/mrblib/04_scrimonia_keycodes.rb
   gems/picoruby-scrimonia/mrblib/06_scrimonia_runner.rb
+  test/mocks.rb
 ]
 
 # pico-sdk と pico-extras は PicoRuby の R2P2 gem に git submodule として含まれている。

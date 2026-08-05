@@ -10,3 +10,9 @@ class HidKeyboard
   def self.reports: () -> Array[untyped]
   def self.ready?: () -> bool
 end
+
+class Scrimonia
+  class Runner
+    def print: (*untyped) -> nil
+  end
+end
