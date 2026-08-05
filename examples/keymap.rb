@@ -73,6 +73,7 @@ mp.add_layer :default, {
   C3.with(velocity: hard) => KC_LALT,
   D3 => KC_LSFT,
 
+  # Macro
   A4 => Scrimonia::Action::Macro.new("Hello, Scrimonia!"),
 
   [D4, E4] => KC_ESC,

@@ -79,6 +79,38 @@ class MacroTest < Picotest::Test
     assert_nil Scrimonia::Action::Macro.hid_code_for(0xE3)
   end
 
+  # 個別の assert は変換表の書き写しになりがちなので、表の形に依存しない性質も見る
+  def test_every_printable_ascii_is_typable
+    b = 0x20
+    while b <= 0x7E
+      assert_not_nil Scrimonia::Action::Macro.hid_code_for(b)
+      b += 1
+    end
+  end
+
+  def test_no_two_bytes_share_a_code
+    seen = {} #: Hash[Integer, Integer]
+    b = 0
+    while b <= 0xFF
+      code = Scrimonia::Action::Macro.hid_code_for(b)
+      if code
+        assert_nil seen[code]
+        seen[code] = b
+      end
+      b += 1
+    end
+  end
+
+  # bit7 を Shift フラグに使えるという前提を裏付ける
+  def test_keycodes_stay_below_the_shift_flag
+    b = 0
+    while b <= 0xFF
+      code = Scrimonia::Action::Macro.hid_code_for(b)
+      assert((code & 0x7F) <= 0x38) if code
+      b += 1
+    end
+  end
+
   # 変換表は KC_* とは独立に生のキーコードを持つため、両者がずれていないことを確かめる
   def test_agrees_with_keycode_constants
     kc = Scrimonia::Keycodes
@@ -100,7 +132,32 @@ class MacroTest < Picotest::Test
     assert_equal kc::KC_SLSH.keycode, code_for("/")
     assert_equal kc::KC_ENTER.keycode, code_for("\n")
     assert_equal kc::KC_TAB.keycode, code_for("\t")
+  end
+
+  # ずれが一番起きやすいのは Shift 付き記号なので、全件を KC_* と突き合わせる
+  def test_shifted_characters_agree_with_keycode_constants
+    kc = Scrimonia::Keycodes
     assert_equal SHIFT | kc::KC_1.keycode, code_for("!")
+    assert_equal SHIFT | kc::KC_2.keycode, code_for("@")
+    assert_equal SHIFT | kc::KC_3.keycode, code_for("#")
+    assert_equal SHIFT | kc::KC_4.keycode, code_for("$")
+    assert_equal SHIFT | kc::KC_5.keycode, code_for("%")
+    assert_equal SHIFT | kc::KC_6.keycode, code_for("^")
+    assert_equal SHIFT | kc::KC_7.keycode, code_for("&")
+    assert_equal SHIFT | kc::KC_8.keycode, code_for("*")
+    assert_equal SHIFT | kc::KC_9.keycode, code_for("(")
+    assert_equal SHIFT | kc::KC_0.keycode, code_for(")")
+    assert_equal SHIFT | kc::KC_MINUS.keycode, code_for("_")
+    assert_equal SHIFT | kc::KC_EQUAL.keycode, code_for("+")
+    assert_equal SHIFT | kc::KC_LBRC.keycode, code_for("{")
+    assert_equal SHIFT | kc::KC_RBRC.keycode, code_for("}")
+    assert_equal SHIFT | kc::KC_BSLS.keycode, code_for("|")
+    assert_equal SHIFT | kc::KC_SCLN.keycode, code_for(":")
+    assert_equal SHIFT | kc::KC_QUOT.keycode, code_for("\"")
+    assert_equal SHIFT | kc::KC_GRV.keycode, code_for("~")
+    assert_equal SHIFT | kc::KC_COMM.keycode, code_for("<")
+    assert_equal SHIFT | kc::KC_DOT.keycode, code_for(">")
+    assert_equal SHIFT | kc::KC_SLSH.keycode, code_for("?")
   end
 
   def test_new_keeps_text
@@ -114,5 +171,13 @@ class MacroTest < Picotest::Test
   def test_new_rejects_unsupported_character
     assert_raise(ArgumentError) { Scrimonia::Action::Macro.new("あ") }
     assert_raise(ArgumentError) { Scrimonia::Action::Macro.new("ok\e[0m") }
+  end
+
+  def test_new_rejects_non_string
+    assert_raise(ArgumentError) { Scrimonia::Action::Macro.new(["a", "b"]) } # steep:ignore ArgumentTypeMismatch
+  end
+
+  def test_new_accepts_empty_string
+    assert_equal "", Scrimonia::Action::Macro.new("").text
   end
 end

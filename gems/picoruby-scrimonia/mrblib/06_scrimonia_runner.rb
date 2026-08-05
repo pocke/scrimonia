@@ -42,8 +42,6 @@ class Scrimonia
       # 来るまではこの初期値が使われる (MIDI の最大ベロシティ)。
       @last_velocity = 127
 
-      # マクロ打ち切りログでどのノートが発火元かを示すために記録する
-      @last_note = 0
     end
 
     def run
@@ -81,7 +79,6 @@ class Scrimonia
 
       # MidiNote アクションがベロシティをパススルーするために記録
       @last_velocity = velocity
-      @last_note = note
 
       if @chord_note_set[note]
         @pending << [note, velocity]
@@ -105,7 +102,7 @@ class Scrimonia
           apply_layer_change(action, [note])
         elsif action
           @pressed[note] = action
-          press_action(action)
+          press_action(action, note)
         end
       end
     end
@@ -126,7 +123,7 @@ class Scrimonia
           if chord_action.is_a?(Action::LayerChange)
             apply_layer_change(chord_action, chord_notes)
           else
-            press_action(chord_action)
+            press_action(chord_action, chord_notes[0])
             release_action(chord_action)
           end
           @pending.clear
@@ -139,7 +136,7 @@ class Scrimonia
           if action.is_a?(Action::LayerChange)
             apply_layer_change(action, [note])
           elsif action
-            press_action(action)
+            press_action(action, note)
             release_action(action)
           end
         end
@@ -162,7 +159,7 @@ class Scrimonia
       print "{\"type\":\"layer_change\",\"layer\":\"#{layer_name}\"}\r\n"
     end
 
-    def press_action(action)
+    def press_action(action, note)
       if action.is_a?(Action::MidiNote)
         MidiOutput.note_on(action.note, @last_velocity)
       elsif action.is_a?(Action::Modifier)
@@ -171,14 +168,15 @@ class Scrimonia
       elsif action.is_a?(Action::Keycode)
         HidKeyboard.press(action.keycode, @modifier_state)
       elsif action.is_a?(Action::Macro)
-        run_macro(action)
+        run_macro(action, note)
       end
     end
 
-    # マクロ文字列を1文字ずつ送出する。同一文字の連続 (例: "ll") をホストが
-    # 取りこぼさないよう、press と release は必ず1文字ごとに対で送る。
-    def run_macro(macro)
+    # 同一文字の連続 (例: "ll") をホストが取りこぼさないよう、press と release は
+    # 必ず1文字ごとに対で送る。
+    def run_macro(macro, note)
       text = macro.text
+      total = 0
       sent = 0
       i = 0
       while i < text.bytesize
@@ -187,40 +185,42 @@ class Scrimonia
         code = byte && Action::Macro.hid_code_for(byte)
         next unless code
 
+        total += 1
         modifier = (code & Action::Macro::SHIFT) > 0 ? MACRO_SHIFT_MODIFIER : 0
-        unless await_hid { HidKeyboard.press(code & 0x7F, modifier) }
-          abort_macro(sent)
-          return
-        end
-        unless await_hid { HidKeyboard.release_all }
-          abort_macro(sent)
+        unless send_hid_with_retry { HidKeyboard.press(code & Action::Macro::KEYCODE_MASK, modifier) }
+          abort_macro(note, sent)
           return
         end
         sent += 1
+        unless send_hid_with_retry { HidKeyboard.release_all }
+          abort_macro(note, sent)
+          return
+        end
       end
 
       # マクロは @modifier_state を載せずに送るため、押下中の修飾キーの状態を
       # ホストへ送り直す。
       send_hid_release
+      print "{\"type\":\"macro_sent\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{total}}\r\n"
     end
 
-    # HID レポートの送出をリトライする。tud_hid_ready が false の間 false が
-    # 返るため、MACRO_REPORT_TIMEOUT_MS まで待つ。ホスト未接続やサスペンド中に
-    # 無限待ちしないよう、超過したら false を返す。
-    def await_hid
+    # 送信できないうちは MACRO_REPORT_TIMEOUT_MS までリトライする。ホスト未接続や
+    # サスペンド中に無限待ちしないよう、超過したら false を返す。
+    def send_hid_with_retry
       deadline = Machine.board_millis + MACRO_REPORT_TIMEOUT_MS
+      return true if yield
       while Machine.board_millis <= deadline
-        return true if yield
         sleep 0.001
+        return true if yield
       end
       false
     end
 
-    def abort_macro(sent)
+    def abort_macro(note, sent)
       # press 済みのキーを打ち切ると押しっぱなしになるため、メインループの
       # リトライで確実に release させる。
       @release_pending = true
-      print "{\"type\":\"macro_aborted\",\"note\":#{@last_note},\"sent\":#{sent}}\r\n"
+      print "{\"type\":\"macro_aborted\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{sent}}\r\n"
     end
 
     def release_action(action)
@@ -291,7 +291,7 @@ class Scrimonia
       else
         @active_chord_action = action
         @active_chord_notes = notes
-        press_action(action)
+        press_action(action, notes[0])
       end
     end
 
@@ -316,7 +316,7 @@ class Scrimonia
           apply_layer_change(action, [p[0]])
         elsif action
           @pressed[p[0]] = action
-          press_action(action)
+          press_action(action, p[0])
         end
       end
     end

@@ -1,0 +1,10 @@
+$hid_reports: Array[untyped]
+$hid_fail_after: Integer?
+$board_millis: Integer
+
+# 実物の sig は picoruby_library が読み込むため、ここではスタブ固有の追加分だけ宣言する。
+class HidKeyboard
+  def self.reset: (?Integer? fail_after) -> void
+  def self.reports: () -> Array[untyped]
+  def self.full?: () -> boolish
+end

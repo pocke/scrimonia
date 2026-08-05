@@ -65,6 +65,7 @@ class Scrimonia
     class Macro
       # hid_code_for の戻り値のうち Shift 要否を示すビット。
       SHIFT: Integer
+      KEYCODE_MASK: Integer
 
       attr_reader text: String
 

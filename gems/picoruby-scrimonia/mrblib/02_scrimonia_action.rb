@@ -34,19 +34,22 @@ class Scrimonia
     end
 
     class Macro
-      # hid_code_for の戻り値の bit7。HID Usage ID は 0x73 までしか使わないので衝突しない。
+      # hid_code_for が返すキーコードは 0x38 以下なので、bit7 を Shift フラグに使える。
       SHIFT = 0x80
+      KEYCODE_MASK = 0x7F
 
       attr_reader :text
 
       def initialize(text)
+        raise ArgumentError, "Macro accepts a String, got #{text.class}" unless text.is_a?(String)
+
         i = 0
         while i < text.bytesize
           byte = text.getbyte(i)
           # CR は打鍵に対応しないが、"\r\n" が Enter 2回にならないよう
           # 例外にはせず送出時に読み飛ばす。
           if byte && byte != 0x0D && Macro.hid_code_for(byte).nil?
-            raise ArgumentError, "Macro cannot type byte #{byte} at index #{i}: #{text}"
+            raise ArgumentError, "Macro cannot type byte #{byte} at index #{i}"
           end
           i += 1
         end
@@ -56,8 +59,8 @@ class Scrimonia
       # US 配列の ASCII 1バイトを HID Usage ID に変換する。bit7 が立っていれば
       # Shift が必要。変換できないバイトは nil を返す。
       #
-      # Hash や文字列テーブルは常時ヒープに載るが、case/when はバイトコードとして
-      # flash に載るだけなのでヒープを消費しない。
+      # 対応表を Hash や文字列で持つと常時ヒープに載るが、case/when はバイトコード
+      # として flash に載るだけで済む。
       def self.hid_code_for(byte)
         case byte
         when 0x61..0x7A then 0x04 + byte - 0x61           # a-z

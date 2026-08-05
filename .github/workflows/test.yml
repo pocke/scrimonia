@@ -9,8 +9,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # picotest はテスト本体をホスト向け PicoRuby VM のサブプロセスとして
-      # 実行するため、その VM をビルドできるだけの submodule が必要。
+      # ホスト向け PicoRuby VM のビルドに lib/picoruby とそのネストした
+      # submodule が要る。build.yml と揃えて recursive で取る。
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive

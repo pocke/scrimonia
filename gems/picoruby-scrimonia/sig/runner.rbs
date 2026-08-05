@@ -32,7 +32,6 @@ class Scrimonia
     @tick: Integer
     @release_pending: bool
     @last_velocity: Integer
-    @last_note: Integer
 
     def initialize: (Array[[Symbol, Hash[layer_key, layer_value]]] layer_definitions) -> void
 
@@ -44,12 +43,12 @@ class Scrimonia
     def handle_note_on: (Integer note, Integer velocity) -> void
     def handle_note_off: (Integer note) -> void
     def switch_layer: (Symbol layer_name) -> void
-    def press_action: (layer_value? action) -> void
-    def run_macro: (Action::Macro macro) -> void
+    def press_action: (layer_value? action, Integer note) -> void
+    def run_macro: (Action::Macro macro, Integer note) -> void
 
-    # HID レポート送出をリトライする。成功したら true、タイムアウトしたら false。
-    def await_hid: () { () -> boolish } -> bool
-    def abort_macro: (Integer sent) -> void
+    # 送出に成功したら true、タイムアウトしたら false。
+    def send_hid_with_retry: () { () -> boolish } -> bool
+    def abort_macro: (Integer note, Integer sent) -> void
     def release_action: (layer_value? action) -> void
     def send_hid_release: () -> void
     def retry_release: () -> void

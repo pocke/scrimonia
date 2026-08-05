@@ -13,7 +13,6 @@ target :test do
   check 'test'
 
   signature 'sig'
-  signature 'gems/picoruby-scrimonia/sig'
   signature 'test/sig'
 end
 
