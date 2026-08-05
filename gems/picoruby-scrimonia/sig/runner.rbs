@@ -13,6 +13,8 @@ class Scrimonia
     type layer_data = [singles_table, Array[chord_entry], chord_note_set]
 
     CHORD_TIMEOUT_MS: Integer
+    MACRO_REPORT_TIMEOUT_MS: Integer
+    MACRO_SHIFT_MODIFIER: Integer
 
     @layers: Hash[Symbol, layer_data]
     @active_layer_name: Symbol
@@ -30,6 +32,7 @@ class Scrimonia
     @tick: Integer
     @release_pending: bool
     @last_velocity: Integer
+    @last_note: Integer
 
     def initialize: (Array[[Symbol, Hash[layer_key, layer_value]]] layer_definitions) -> void
 
@@ -42,6 +45,11 @@ class Scrimonia
     def handle_note_off: (Integer note) -> void
     def switch_layer: (Symbol layer_name) -> void
     def press_action: (layer_value? action) -> void
+    def run_macro: (Action::Macro macro) -> void
+
+    # HID レポート送出をリトライする。成功したら true、タイムアウトしたら false。
+    def await_hid: () { () -> boolish } -> bool
+    def abort_macro: (Integer sent) -> void
     def release_action: (layer_value? action) -> void
     def send_hid_release: () -> void
     def retry_release: () -> void

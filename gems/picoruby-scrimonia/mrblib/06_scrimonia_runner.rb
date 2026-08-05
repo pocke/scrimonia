@@ -2,6 +2,11 @@ class Scrimonia
   class Runner
     CHORD_TIMEOUT_MS = 50
 
+    # マクロ送出時、1レポートあたり tud_hid_ready を待つ上限
+    MACRO_REPORT_TIMEOUT_MS = 200
+    # HID 修飾キーのビットマスク (左 Shift)
+    MACRO_SHIFT_MODIFIER = 0x02
+
     def initialize(layer_definitions)
       @layers = {}
       layer_definitions.each do |name, mapping|
@@ -36,6 +41,9 @@ class Scrimonia
       # MidiNote アクションのベロシティパススルー用。最初の NOTE_ON が
       # 来るまではこの初期値が使われる (MIDI の最大ベロシティ)。
       @last_velocity = 127
+
+      # マクロ打ち切りログでどのノートが発火元かを示すために記録する
+      @last_note = 0
     end
 
     def run
@@ -73,6 +81,7 @@ class Scrimonia
 
       # MidiNote アクションがベロシティをパススルーするために記録
       @last_velocity = velocity
+      @last_note = note
 
       if @chord_note_set[note]
         @pending << [note, velocity]
@@ -161,7 +170,57 @@ class Scrimonia
         HidKeyboard.press(0, @modifier_state)
       elsif action.is_a?(Action::Keycode)
         HidKeyboard.press(action.keycode, @modifier_state)
+      elsif action.is_a?(Action::Macro)
+        run_macro(action)
       end
+    end
+
+    # マクロ文字列を1文字ずつ送出する。同一文字の連続 (例: "ll") をホストが
+    # 取りこぼさないよう、press と release は必ず1文字ごとに対で送る。
+    def run_macro(macro)
+      text = macro.text
+      sent = 0
+      i = 0
+      while i < text.bytesize
+        byte = text.getbyte(i)
+        i += 1
+        code = byte && Action::Macro.hid_code_for(byte)
+        next unless code
+
+        modifier = (code & Action::Macro::SHIFT) > 0 ? MACRO_SHIFT_MODIFIER : 0
+        unless await_hid { HidKeyboard.press(code & 0x7F, modifier) }
+          abort_macro(sent)
+          return
+        end
+        unless await_hid { HidKeyboard.release_all }
+          abort_macro(sent)
+          return
+        end
+        sent += 1
+      end
+
+      # マクロは @modifier_state を載せずに送るため、押下中の修飾キーの状態を
+      # ホストへ送り直す。
+      send_hid_release
+    end
+
+    # HID レポートの送出をリトライする。tud_hid_ready が false の間 false が
+    # 返るため、MACRO_REPORT_TIMEOUT_MS まで待つ。ホスト未接続やサスペンド中に
+    # 無限待ちしないよう、超過したら false を返す。
+    def await_hid
+      deadline = Machine.board_millis + MACRO_REPORT_TIMEOUT_MS
+      while Machine.board_millis <= deadline
+        return true if yield
+        sleep 0.001
+      end
+      false
+    end
+
+    def abort_macro(sent)
+      # press 済みのキーを打ち切ると押しっぱなしになるため、メインループの
+      # リトライで確実に release させる。
+      @release_pending = true
+      print "{\"type\":\"macro_aborted\",\"note\":#{@last_note},\"sent\":#{sent}}\r\n"
     end
 
     def release_action(action)
