@@ -34,6 +34,13 @@ receiver = SerialKeymapReceiver.new(KEYMAP_PATH)
 
 # メインループ: キーマップ受信を監視し、受信完了時にリロードする。
 loop do
+  # Sandbox は join: false で起動するため、keymap.rb 内の例外は
+  # 拾わないとどこにも出力されないまま死ぬ。
+  if sandbox && (err = sandbox.error)
+    print "Keymap error: #{err.message}\r\n"
+    sandbox = nil
+  end
+
   if receiver.poll
     print "Keymap uploaded. Restarting...\r\n"
     # TODO: 既存の Sandbox タスクを停止する方法が確立したら置き換える。
