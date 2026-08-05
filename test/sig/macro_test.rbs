@@ -1,0 +1,18 @@
+class MacroTest < Picotest::Test
+  SHIFT: Integer
+
+  def code_for: (String char) -> Integer?
+
+  def test_lowercase_letters: () -> void
+  def test_uppercase_letters: () -> void
+  def test_digits: () -> void
+  def test_shifted_digits: () -> void
+  def test_symbols: () -> void
+  def test_shifted_symbols: () -> void
+  def test_control_characters: () -> void
+  def test_unsupported_bytes: () -> void
+  def test_agrees_with_keycode_constants: () -> void
+  def test_new_keeps_text: () -> void
+  def test_new_accepts_carriage_return: () -> void
+  def test_new_rejects_unsupported_character: () -> void
+end
