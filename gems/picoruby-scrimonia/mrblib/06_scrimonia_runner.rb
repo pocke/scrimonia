@@ -41,7 +41,6 @@ class Scrimonia
       # MidiNote アクションのベロシティパススルー用。最初の NOTE_ON が
       # 来るまではこの初期値が使われる (MIDI の最大ベロシティ)。
       @last_velocity = 127
-
     end
 
     def run
@@ -205,9 +204,9 @@ class Scrimonia
     # 送信できないうちは MACRO_REPORT_TIMEOUT_MS までリトライする。ホスト未接続や
     # サスペンド中に無限待ちしないよう、超過したら false を返す。
     def send_hid_with_retry
-      deadline = Machine.board_millis + MACRO_REPORT_TIMEOUT_MS
+      started = Machine.board_millis
       return true if yield
-      while Machine.board_millis <= deadline
+      while Machine.board_millis - started <= MACRO_REPORT_TIMEOUT_MS
         sleep 0.001
         return true if yield
       end

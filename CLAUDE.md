@@ -24,7 +24,7 @@ rake all
 
 各ステージは個別にも実行できる。
 
-#### テスト
+### テスト
 
 ```sh
 rake test
@@ -32,7 +32,7 @@ rake test
 
 ホスト向け PicoRuby VM をビルドし、`test/` 以下を picotest で実行する。
 
-## クリーン
+### クリーン
 
 ```sh
 rake clean       # ビルド成果物のクリーン

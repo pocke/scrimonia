@@ -18,7 +18,7 @@ rescue => e
 end
 
 # キーマップのエラーはラッチして繰り返し出力する。壊れたキーマップは起動直後に
-# 落ちるが、その時点では USB CDC が未接続で、cdc_out_chars が出力を捨てるため。
+# 落ちるが、その時点ではホストが CDC を開いておらず、TinyUSB が送信データを捨てるため。
 keymap_error = nil #: String?
 ERROR_REPRINT_INTERVAL = 50 # ループ 50 回 = 約 5 秒
 
@@ -58,10 +58,6 @@ loop do
     sandbox = nil
   end
 
-  if keymap_error && ticks % ERROR_REPRINT_INTERVAL == 0
-    print "Keymap error: #{keymap_error}. Fix keymap.rb and upload it again.\r\n"
-  end
-
   if receiver.poll
     print "Keymap uploaded. Restarting...\r\n"
     # TODO: 既存の Sandbox タスクを停止する方法が確立したら置き換える。
@@ -69,7 +65,11 @@ loop do
     sandbox = Sandbox.new or raise
     keymap_error = load_keymap(sandbox, KEYMAP_PATH)
     ticks = 0
-    print "Keymap reloaded.\r\n"
+    print(keymap_error ? "Keymap reload failed.\r\n" : "Keymap reloaded.\r\n")
+  end
+
+  if keymap_error && ticks % ERROR_REPRINT_INTERVAL == 0
+    print "Keymap error: #{keymap_error}. Fix keymap.rb and upload it again.\r\n"
   end
   ticks += 1
   sleep_ms 100

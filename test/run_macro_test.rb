@@ -77,6 +77,26 @@ class RunMacroTest < Picotest::Test
       $printed[-1]
   end
 
+  # 和音候補として保留されたノートが flush されるとき、マクロは押された順に
+  # 発火する。ログのノートは「直近の NOTE_ON」ではなく発火元でなければならない。
+  def test_reports_the_originating_note_when_pending_notes_are_flushed
+    mapping = {
+      60 => Scrimonia::Action::Macro.new("a"),
+      64 => Scrimonia::Action::Macro.new("b"),
+      [60, 67] => Scrimonia::Action::Keycode.new(0x29),
+    } #: Hash[Scrimonia::layer_key, Scrimonia::layer_value]
+    runner = Scrimonia::Runner.new([[:default, mapping]])
+    HidKeyboard.reset
+    runner.handle_note_on(60, 100) # steep:ignore NoMethod
+    runner.handle_note_on(64, 100) # steep:ignore NoMethod
+
+    sent = [] #: Array[String]
+    $printed.each { |line| sent << line if line.include?("macro_sent") }
+    assert_equal 2, sent.size
+    assert sent[0].include?("\"note\":60")
+    assert sent[1].include?("\"note\":64")
+  end
+
   # 打鍵はホストに届いているので、release で落ちた文字も sent に数える
   def test_counts_a_character_whose_press_went_out_before_aborting
     HidKeyboard.reset(3)
