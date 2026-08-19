@@ -2,6 +2,11 @@ class Scrimonia
   class Runner
     CHORD_TIMEOUT_MS = 50
 
+    # マクロ送出時、1レポートあたり tud_hid_ready を待つ上限
+    MACRO_REPORT_TIMEOUT_MS = 200
+    # HID 修飾キーのビットマスク (左 Shift)
+    MACRO_SHIFT_MODIFIER = 0x02
+
     def initialize(layer_definitions)
       @layers = {}
       layer_definitions.each do |name, mapping|
@@ -96,7 +101,7 @@ class Scrimonia
           apply_layer_change(action, [note])
         elsif action
           @pressed[note] = action
-          press_action(action)
+          press_action(action, note)
         end
       end
     end
@@ -117,7 +122,7 @@ class Scrimonia
           if chord_action.is_a?(Action::LayerChange)
             apply_layer_change(chord_action, chord_notes)
           else
-            press_action(chord_action)
+            press_action(chord_action, chord_notes[0])
             release_action(chord_action)
           end
           @pending.clear
@@ -130,7 +135,7 @@ class Scrimonia
           if action.is_a?(Action::LayerChange)
             apply_layer_change(action, [note])
           elsif action
-            press_action(action)
+            press_action(action, note)
             release_action(action)
           end
         end
@@ -153,7 +158,7 @@ class Scrimonia
       print "{\"type\":\"layer_change\",\"layer\":\"#{layer_name}\"}\r\n"
     end
 
-    def press_action(action)
+    def press_action(action, note)
       if action.is_a?(Action::MidiNote)
         MidiOutput.note_on(action.note, @last_velocity)
       elsif action.is_a?(Action::Modifier)
@@ -161,7 +166,58 @@ class Scrimonia
         HidKeyboard.press(0, @modifier_state)
       elsif action.is_a?(Action::Keycode)
         HidKeyboard.press(action.keycode, @modifier_state)
+      elsif action.is_a?(Action::Macro)
+        run_macro(action, note)
       end
+    end
+
+    # 同一文字の連続 (例: "ll") をホストが取りこぼさないよう、press と release は
+    # 必ず1文字ごとに対で送る。
+    def run_macro(macro, note)
+      text = macro.text
+      sent = 0
+      i = 0
+      while i < text.bytesize
+        byte = text.getbyte(i)
+        i += 1
+        code = byte && Action::Macro.hid_code_for(byte)
+        next unless code
+
+        modifier = (code & Action::Macro::SHIFT) > 0 ? MACRO_SHIFT_MODIFIER : 0
+        unless send_hid_with_retry { HidKeyboard.press(code & Action::Macro::KEYCODE_MASK, modifier) }
+          abort_macro(note, sent)
+          return
+        end
+        sent += 1
+        unless send_hid_with_retry { HidKeyboard.release_all }
+          abort_macro(note, sent)
+          return
+        end
+      end
+
+      # マクロは @modifier_state を載せずに送るため、押下中の修飾キーの状態を
+      # ホストへ送り直す。
+      send_hid_release
+      print "{\"type\":\"macro_sent\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{sent}}\r\n"
+    end
+
+    # 送信できないうちは MACRO_REPORT_TIMEOUT_MS までリトライする。ホスト未接続や
+    # サスペンド中に無限待ちしないよう、超過したら false を返す。
+    def send_hid_with_retry
+      started = Machine.board_millis
+      return true if yield
+      while Machine.board_millis - started <= MACRO_REPORT_TIMEOUT_MS
+        sleep 0.001
+        return true if yield
+      end
+      false
+    end
+
+    def abort_macro(note, sent)
+      # press 済みのキーを打ち切ると押しっぱなしになるため、メインループの
+      # リトライで確実に release させる。
+      @release_pending = true
+      print "{\"type\":\"macro_aborted\",\"note\":#{note},\"name\":\"#{Note.name_for(note)}\",\"sent\":#{sent}}\r\n"
     end
 
     def release_action(action)
@@ -232,7 +288,7 @@ class Scrimonia
       else
         @active_chord_action = action
         @active_chord_notes = notes
-        press_action(action)
+        press_action(action, notes[0])
       end
     end
 
@@ -257,7 +313,7 @@ class Scrimonia
           apply_layer_change(action, [p[0]])
         elsif action
           @pressed[p[0]] = action
-          press_action(action)
+          press_action(action, p[0])
         end
       end
     end

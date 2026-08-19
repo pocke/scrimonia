@@ -1,0 +1,21 @@
+class RunMacroTest < Picotest::Test
+  LSHIFT: Integer
+
+  @runner: Scrimonia::Runner
+
+  def setup: () -> void
+  def run_macro: (String text) -> void
+
+  def test_sends_press_and_release_for_each_character: () -> void
+  def test_repeats_release_between_identical_characters: () -> void
+  def test_applies_shift_modifier_and_strips_the_flag_from_the_keycode: () -> void
+  def test_skips_carriage_return: () -> void
+  def test_empty_macro_sends_only_the_trailing_release: () -> void
+  def test_restores_modifier_state_after_sending: () -> void
+  def test_aborts_and_flags_release_when_a_report_never_goes_out: () -> void
+  def test_does_not_flag_release_when_everything_goes_out: () -> void
+  def test_retries_until_the_endpoint_accepts_the_report: () -> void
+  def test_reports_the_triggering_note_and_count_when_finished: () -> void
+  def test_reports_the_originating_note_when_pending_notes_are_flushed: () -> void
+  def test_counts_a_character_whose_press_went_out_before_aborting: () -> void
+end

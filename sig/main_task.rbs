@@ -1,1 +1,7 @@
 KEYMAP_PATH: String
+ERROR_REPRINT_INTERVAL: Integer
+
+class Object
+  # 読み込みに失敗したらエラーメッセージを、成功したら nil を返す。
+  def load_keymap: (Sandbox sandbox, String path) -> String?
+end

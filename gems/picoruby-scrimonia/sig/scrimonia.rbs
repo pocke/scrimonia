@@ -1,6 +1,6 @@
 class Scrimonia
   type layer_key = Note | Array[Note] | Integer
-  type layer_value = Action::Keycode | Action::Modifier | Action::LayerChange | Action::MidiNote | Note
+  type layer_value = Action::Keycode | Action::Modifier | Action::LayerChange | Action::MidiNote | Action::Macro | Note
   type layer_mapping = Hash[layer_key, layer_value]
 
   @layer_definitions: Array[[Symbol, Hash[layer_key, layer_value]]]
@@ -59,6 +59,21 @@ class Scrimonia
     class MidiNote
       attr_reader note: Integer
       def initialize: (Integer note) -> void
+    end
+
+    # 文字列を HID キーストロークの並びとして自動入力するアクション。
+    class Macro
+      # hid_code_for の戻り値のうち Shift 要否を示すビット。
+      SHIFT: Integer
+      KEYCODE_MASK: Integer
+
+      attr_reader text: String
+
+      # 打鍵できない文字が含まれていたら ArgumentError を投げる。
+      def initialize: (String text) -> void
+
+      # US 配列の ASCII 1バイトを HID Usage ID に変換する。変換できなければ nil。
+      def self.hid_code_for: (Integer byte) -> Integer?
     end
   end
 end

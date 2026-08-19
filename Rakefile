@@ -2,7 +2,21 @@ require "fileutils"
 
 PICO_SDK_TAG = "2.1.0"
 BUILD_CONFIG = "scrimonia-cortex-m0plus"
+HOST_BUILD_CONFIG = "scrimonia-host"
 BUILD_DIR = "build"
+
+PICORUBY_BIN = "lib/picoruby/build/host/bin/femtoruby"
+PICOTEST_PATH = "lib/picoruby/mrbgems/picoruby-picotest/mrblib/picotest.rb"
+
+# 04 の KC_* が 02 の Action::Keycode を、06 が 01 の Note を参照するため、依存順に並べる。
+# mocks は Runner を再オープンするので最後に置く。
+TEST_LOAD_FILES = %w[
+  gems/picoruby-scrimonia/mrblib/01_scrimonia_note.rb
+  gems/picoruby-scrimonia/mrblib/02_scrimonia_action.rb
+  gems/picoruby-scrimonia/mrblib/04_scrimonia_keycodes.rb
+  gems/picoruby-scrimonia/mrblib/06_scrimonia_runner.rb
+  test/mocks.rb
+]
 
 # pico-sdk と pico-extras は PicoRuby の R2P2 gem に git submodule として含まれている。
 # 環境変数で外部のパスを指定することも可能。
@@ -18,6 +32,7 @@ task :default do
   puts "Usage:"
   puts "  rake setup   # initialize submodules and install dependencies"
   puts "  rake all     # build everything"
+  puts "  rake test    # run tests on the host PicoRuby VM"
   puts "  rake clean   # clean build artifacts"
 end
 
@@ -64,6 +79,28 @@ task :build do
   sh "cmake --build #{BUILD_DIR}"
 end
 
+# picotest はテスト本体をこの VM のサブプロセスとして実行する。CRuby ではなく
+# mruby/c 上で走るため、String がバイト単位であるなどの差異を踏んだまま検証できる。
+task :host_vm => "lib/picoruby" do
+  config = File.expand_path("build_config/#{HOST_BUILD_CONFIG}.rb")
+  FileUtils.cd "lib/picoruby" do
+    sh "MRUBY_CONFIG=#{config} rake"
+  end
+end
+
+desc "run tests"
+task :test => :host_vm do
+  require_relative PICOTEST_PATH
+
+  ENV['RUBY'] = File.expand_path(PICORUBY_BIN)
+
+  runner = Picotest::Runner.new(
+    File.expand_path("test"),
+    load_files: TEST_LOAD_FILES.map { |f| File.expand_path(f) },
+  )
+  exit 1 if runner.run > 0
+end
+
 task :clean do
   FileUtils.cd "lib/picoruby" do
     config = File.expand_path("../../build_config/#{BUILD_CONFIG}.rb")
@@ -81,8 +118,10 @@ end
 # libmruby の中間ファイルも含めた完全クリーン
 task :deep_clean do
   FileUtils.cd "lib/picoruby" do
-    config = File.expand_path("../../build_config/#{BUILD_CONFIG}.rb")
-    sh "MRUBY_CONFIG=#{config} rake deep_clean"
+    [BUILD_CONFIG, HOST_BUILD_CONFIG].each do |name|
+      config = File.expand_path("../../build_config/#{name}.rb")
+      sh "MRUBY_CONFIG=#{config} rake deep_clean"
+    end
   end
   FileUtils.rm_rf BUILD_DIR
 end
