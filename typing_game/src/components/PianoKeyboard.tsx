@@ -68,6 +68,15 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
     layoutMap.set(layout.noteNumber, layout)
   }
 
+  // macro 以外の和音 (keycode/layer の同時押し) は常時点線とラベルを描く。
+  // macro だけ highlightChords (次に打てるものだけ) に絞るのは、cool.rb に
+  // マクロ和音が50個あり、常時描くと鍵盤が読めなくなるため。keycode/layer の
+  // 同時押しはキーマップ全体でも数が少ないので、常時表示しても読める。
+  const staticChords: ChordHighlight[] = keymap
+    .filter(e => e.noteNumbers.length > 1 && e.type !== 'macro')
+    .map(e => ({ noteNumbers: e.noteNumbers, label: entryLabel(e) }))
+  const chordsToRender = [...staticChords, ...(highlightChords ?? [])]
+
   const whiteKeys = layouts.filter(k => !k.isBlack)
   const blackKeys = layouts.filter(k => k.isBlack)
 
@@ -150,9 +159,9 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
         )
       })}
 
-      {/* 次に打てる和音 (マクロ) の点線。常時全和音を描くと cool.rb だけで51本になり
-          鍵盤が読めなくなるため、ハイライト中の和音だけに絞る。 */}
-      {(highlightChords ?? []).map((chord, i) => {
+      {/* 和音の点線とラベル。常時表示分 (staticChords) と、次に打てるマクロ
+          (highlightChords) をまとめて描く。 */}
+      {chordsToRender.map((chord, i) => {
         const positions = chord.noteNumbers
           .map(n => layoutMap.get(n))
           .filter((l): l is KeyLayout => l != null)

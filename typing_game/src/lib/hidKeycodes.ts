@@ -51,16 +51,23 @@ export function hidCodeToChar(hidCode: number, type: 'keycode' | 'modifier' | 'm
   return HID_KEYCODE_TO_CHAR[hidCode] ?? `0x${hidCode.toString(16)}`
 }
 
-// マクロの text 中の空白・タブ・改行は鍵盤上のラベルでは見えないため、
+// マクロの text 中の空白・タブ・改行・復帰は鍵盤上のラベルでは見えないため、
 // 目に見える記号に置き換える。
 const MACRO_TEXT_DISPLAY: Record<string, string> = {
   ' ': '␣',
   '\t': '⇥',
   '\n': '⏎',
+  '\r': '␍',
 }
+const MACRO_TEXT_DISPLAY_PATTERN = new RegExp(`[${Object.keys(MACRO_TEXT_DISPLAY).join('')}]`, 'g')
+
+const MACRO_LABEL_MAX_LENGTH = 10
 
 function macroTextLabel(text: string): string {
-  return text.replace(/[ \t\n]/g, ch => MACRO_TEXT_DISPLAY[ch])
+  const replaced = text.replace(MACRO_TEXT_DISPLAY_PATTERN, ch => MACRO_TEXT_DISPLAY[ch])
+  return replaced.length > MACRO_LABEL_MAX_LENGTH
+    ? replaced.slice(0, MACRO_LABEL_MAX_LENGTH) + '…'
+    : replaced
 }
 
 /** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text / layerName から組み立てる。 */

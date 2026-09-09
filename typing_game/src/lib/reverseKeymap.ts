@@ -48,7 +48,12 @@ export function buildReverseKeymap(keymap: LayerKeymap): ReverseKeymap {
     }
 
     if (entry.type === 'macro') {
-      macros.push({ ...hint, text: entry.text })
+      // Macro.new("") は Ruby 側で有効な値のため、空文字なら "" が remaining の
+      // 先頭に必ず一致し、常時ハイライトされ続けてしまう。文字を打たないマクロは
+      // ヒントとして無意味なので取り除く。
+      if (entry.text.length > 0) {
+        macros.push({ ...hint, text: entry.text })
+      }
       continue
     }
 
