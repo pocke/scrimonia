@@ -47,6 +47,9 @@ function App() {
   // raw が無い (RAW_KEYMAP_STORAGE_KEY 導入前に保存された) 場合や、
   // 再パースが失敗した場合はキャッシュ済みの keymap をそのまま使う。
   const reparsedRawKeymapRef = useRef(false)
+  // 設定モーダルから keymap.rb を手動で再アップロードした (handleKeymapParsed が
+  // 呼ばれた) ら、起動時の再パース結果は古い方の結果になりうるので捨てる。
+  const manualKeymapUploadRef = useRef(false)
   useEffect(() => {
     // PicoRuby.wasm の VM はモジュール単位で1個しか無く、2つの executeRuby を
     // 並行実行すると互いの task が干渉して壊れる。StrictMode はこの effect を
@@ -55,10 +58,13 @@ function App() {
     reparsedRawKeymapRef.current = true
     parseKeymap(rawKeymap)
       .then(data => {
+        if (manualKeymapUploadRef.current) return
         setKeymap(data)
         saveKeymapToStorage(data)
       })
-      .catch(() => {})
+      .catch(() => {
+        console.warn('Failed to re-parse the cached keymap.rb; keeping the previously cached parse result.')
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -170,6 +176,7 @@ function App() {
     : null
 
   const handleKeymapParsed = (data: KeymapData, rawContent: string) => {
+    manualKeymapUploadRef.current = true
     setKeymap(data)
     saveKeymapToStorage(data)
     setRawKeymap(rawContent)

@@ -62,7 +62,11 @@ const MACRO_TEXT_DISPLAY: Record<string, string> = {
 const LABEL_MAX_LENGTH = 10
 
 function truncateLabel(label: string): string {
-  return label.length > LABEL_MAX_LENGTH ? label.slice(0, LABEL_MAX_LENGTH) + '…' : label
+  // string.slice は UTF-16 コードユニット単位なので、サロゲートペアを含む
+  // 文字列 (絵文字など) だと途中で切って壊れる。Array.from はコードポイント
+  // 単位で列挙するのでそれを避けられる。
+  const chars = Array.from(label)
+  return chars.length > LABEL_MAX_LENGTH ? chars.slice(0, LABEL_MAX_LENGTH).join('') + '…' : label
 }
 
 function macroTextLabel(text: string): string {
