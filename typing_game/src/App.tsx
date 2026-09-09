@@ -237,7 +237,7 @@ function App() {
             </div>
             <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} highlightChords={typingHighlightChords} activeNotes={allActiveNotes} wrongNotes={serialWrongNotes} />
             <MidiStatusView status={midiStatus} />
-            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onChordHighlightChange={setTypingHighlightChords} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
+            <TypingGame key={appMode} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onChordHighlightChange={setTypingHighlightChords} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
           </>
         )}
