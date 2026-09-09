@@ -1,5 +1,5 @@
-import type { LayerKeymap, KeymapEntry } from '../types'
-import { hidCodeToChar } from '../lib/hidKeycodes'
+import type { ChordHighlight, LayerKeymap, KeymapEntry } from '../types'
+import { entryLabel } from '../lib/hidKeycodes'
 import {
   buildKeyboardLayout,
   totalWhiteKeys,
@@ -15,13 +15,15 @@ interface Props {
   keymap: LayerKeymap
   /** タイピングのヒント (= 次に押すべき鍵) として青系でハイライトするノート。 */
   highlightNotes?: number[]
+  /** 次に打てるマクロ和音。点線と label で結んで表示する。 */
+  highlightChords?: ChordHighlight[]
   /** 現在押下中で正しい (ヒントに含まれる) ノート。緑系でハイライトする。 */
   activeNotes?: number[]
   /** 現在押下中だがヒントに含まれない誤打鍵。赤系でハイライトする。 */
   wrongNotes?: number[]
 }
 
-export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes }: Props) {
+export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeNotes, wrongNotes }: Props) {
   if (keymap.length === 0) return null
 
   const allNoteNumbers = keymap.flatMap(e => e.noteNumbers)
@@ -38,7 +40,8 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
   const activeSet = new Set(activeNotes ?? [])
   const wrongSet = new Set(wrongNotes ?? [])
 
-  // ノート番号ごとのマッピングを構築（和音エントリは各ノートに登録）
+  // ノート番号ごとのマッピングを構築（和音エントリは各ノートに登録）。
+  // 色分け (isModifier / hasMappings) にはこちらを使う。
   const noteMap = new Map<number, KeymapEntry[]>()
   for (const entry of keymap) {
     for (const noteNum of entry.noteNumbers) {
@@ -48,14 +51,22 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
     }
   }
 
-  // 和音エントリの線を描画するためのレイアウトマップ
+  // ラベル表示専用のマッピング。和音エントリ (例: cool.rb の C3 が11個のマクロ和音
+  // に相乗りする) を含めると1鍵にラベルが積み重なって潰れるため、単音キーだけに絞る。
+  const singleNoteMap = new Map<number, KeymapEntry[]>()
+  for (const entry of keymap) {
+    if (entry.noteNumbers.length !== 1) continue
+    const noteNum = entry.noteNumbers[0]
+    const existing = singleNoteMap.get(noteNum) ?? []
+    existing.push(entry)
+    singleNoteMap.set(noteNum, existing)
+  }
+
+  // 和音の点線を描画するためのレイアウトマップ
   const layoutMap = new Map<number, KeyLayout>()
   for (const layout of layouts) {
     layoutMap.set(layout.noteNumber, layout)
   }
-
-  // 和音エントリ（noteNumbers.length > 1）を収集
-  const chordEntries = keymap.filter(e => e.noteNumbers.length > 1)
 
   const whiteKeys = layouts.filter(k => !k.isBlack)
   const blackKeys = layouts.filter(k => k.isBlack)
@@ -69,6 +80,7 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
       {/* 白鍵 */}
       {whiteKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
+        const labelEntries = singleNoteMap.get(key.noteNumber)
         const isWrong = wrongSet.has(key.noteNumber)
         const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
@@ -90,7 +102,7 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
               stroke="#374151"
               strokeWidth={1}
             />
-            {entries && <KeyLabels entries={entries} x={key.x + WHITE_KEY_WIDTH / 2} isBlack={false} />}
+            {labelEntries && <KeyLabels entries={labelEntries} x={key.x + WHITE_KEY_WIDTH / 2} isBlack={false} />}
             <text
               x={key.x + WHITE_KEY_WIDTH / 2}
               y={WHITE_KEY_HEIGHT + 18}
@@ -107,6 +119,7 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
       {/* 黒鍵（白鍵の上に描画） */}
       {blackKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
+        const labelEntries = singleNoteMap.get(key.noteNumber)
         const isWrong = wrongSet.has(key.noteNumber)
         const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
@@ -132,14 +145,15 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
               strokeWidth={1}
               rx={2}
             />
-            {entries && <KeyLabels entries={entries} x={key.x + BLACK_KEY_WIDTH / 2} isBlack={true} />}
+            {labelEntries && <KeyLabels entries={labelEntries} x={key.x + BLACK_KEY_WIDTH / 2} isBlack={true} />}
           </g>
         )
       })}
 
-      {/* 和音の接続線 */}
-      {chordEntries.map((entry, i) => {
-        const positions = entry.noteNumbers
+      {/* 次に打てる和音 (マクロ) の点線。常時全和音を描くと cool.rb だけで51本になり
+          鍵盤が読めなくなるため、ハイライト中の和音だけに絞る。 */}
+      {(highlightChords ?? []).map((chord, i) => {
+        const positions = chord.noteNumbers
           .map(n => layoutMap.get(n))
           .filter((l): l is KeyLayout => l != null)
 
@@ -149,6 +163,8 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
           x: l.isBlack ? l.x + BLACK_KEY_WIDTH / 2 : l.x + WHITE_KEY_WIDTH / 2,
           y: l.isBlack ? BLACK_KEY_HEIGHT + 5 : WHITE_KEY_HEIGHT - 5,
         }))
+        const midX = points.reduce((sum, p) => sum + p.x, 0) / points.length
+        const midY = points.reduce((sum, p) => sum + p.y, 0) / points.length
 
         return (
           <g key={`chord-${i}`}>
@@ -165,6 +181,19 @@ export function PianoKeyboard({ keymap, highlightNotes, activeNotes, wrongNotes 
                 opacity={0.7}
               />
             ))}
+            <text
+              x={midX}
+              y={midY}
+              textAnchor="middle"
+              fontSize={11}
+              fontWeight="bold"
+              fill="#c7d2fe"
+              stroke="#1e1b4b"
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
+              {chord.label}
+            </text>
           </g>
         )
       })}
@@ -191,7 +220,7 @@ function KeyLabels({ entries, x, isBlack }: { entries: KeymapEntry[], x: number,
     return (
       <g>
         {sorted.map((entry, i) => {
-          const label = hidCodeToChar(entry.hidCode, entry.type)
+          const label = entryLabel(entry)
           const y = startY + i * spacing
           return (
             <g key={i}>
@@ -217,7 +246,7 @@ function KeyLabels({ entries, x, isBlack }: { entries: KeymapEntry[], x: number,
   return (
     <g>
       {sorted.map((entry, i) => {
-        const label = hidCodeToChar(entry.hidCode, entry.type)
+        const label = entryLabel(entry)
         const y = startY + i * spacing
         return (
           <g key={i}>

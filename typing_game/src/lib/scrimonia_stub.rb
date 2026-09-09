@@ -32,15 +32,6 @@ class Scrimonia
             note_names << Note.name_for(k)
           end
         end
-        if value.is_a?(Action::Keycode)
-          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
-        elsif value.is_a?(Action::Modifier)
-          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
-        elsif value.is_a?(Note)
-          # MIDI パススルー (例: passthrough_mapping[n] = n)。
-          # hidCode フィールドに出力 MIDI ノート番号を流用する。
-          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
-        end
       elsif key.is_a?(Note)
         note_numbers = [key.number]
         note_names = [Note.name_for(key.number)]
@@ -50,16 +41,53 @@ class Scrimonia
           vel_min = key.velocity.first
           vel_max = key.velocity.last
         end
-        if value.is_a?(Action::Keycode)
-          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
-        elsif value.is_a?(Action::Modifier)
-          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
-        elsif value.is_a?(Note)
-          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
-        end
+      else
+        next
       end
+
+      type, extra_json = action_json_fields(value)
+      next unless type
+
+      entries << [note_numbers, note_names, vel_min, vel_max, type, extra_json]
     end
     @layers[name.to_s] = entries
+  end
+
+  # Action の型ごとに JSON の type と、type 固有フィールドの JSON 断片 (先頭に
+  # カンマを含む) を返す。keycode/modifier/midi の断片は hidCode フィールドを
+  # そのまま使うので、既存の出力 JSON は変わらない。
+  def action_json_fields(value)
+    if value.is_a?(Action::Keycode)
+      ["keycode", ',"hidCode":' + value.keycode.to_s]
+    elsif value.is_a?(Action::Modifier)
+      ["modifier", ',"hidCode":' + value.modifier.to_s]
+    elsif value.is_a?(Note)
+      # MIDI パススルー (例: passthrough_mapping[n] = n)。
+      # hidCode フィールドに出力 MIDI ノート番号を流用する。
+      ["midi", ',"hidCode":' + value.number.to_s]
+    elsif value.is_a?(Action::Macro)
+      ["macro", ',"text":"' + json_escape(value.text) + '"']
+    end
+  end
+
+  # Macro#initialize が "\r\n" 以外の制御文字とマルチバイト文字を弾くため、
+  # エスケープ対象は " \ LF TAB CR の5バイトだけでよい。
+  def json_escape(str)
+    result = ""
+    i = 0
+    while i < str.bytesize
+      byte = str.getbyte(i)
+      result += case byte
+        when 0x22 then '\\"'
+        when 0x5C then '\\\\'
+        when 0x0A then '\\n'
+        when 0x09 then '\\t'
+        when 0x0D then '\\r'
+        else str[i]
+        end
+      i += 1
+    end
+    result
   end
 
   # JSON を手動で組み立てる（json gem の有無に依存しない）。
@@ -81,7 +109,7 @@ class Scrimonia
           ',"noteNames":' + names +
           ',"velocity":' + vel +
           ',"type":"' + e[4] + '"' +
-          ',"hidCode":' + e[5].to_s + '}'
+          e[5] + '}'
       end
       layer_parts << '"' + name + '":[' + entry_strs.join(",") + ']'
     end

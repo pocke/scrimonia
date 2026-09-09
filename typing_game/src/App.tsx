@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { KeymapData } from './types'
+import type { ChordHighlight, KeymapData } from './types'
 import { KeymapUploader } from './components/KeymapUploader'
 import { KeymapSender } from './components/KeymapSender'
 import { PianoKeyboard } from './components/PianoKeyboard'
@@ -34,6 +34,7 @@ function App() {
   const [keymap, setKeymap] = useState<KeymapData | null>(loadKeymapFromStorage)
   const [rawKeymap, setRawKeymap] = useState<string | null>(() => localStorage.getItem(RAW_KEYMAP_STORAGE_KEY))
   const [typingHighlightNotes, setTypingHighlightNotes] = useState<number[] | undefined>()
+  const [typingHighlightChords, setTypingHighlightChords] = useState<ChordHighlight[] | undefined>()
   const [appMode, setAppMode] = useState<GameMode>('en')
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
@@ -211,9 +212,9 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} activeNotes={allActiveNotes} wrongNotes={serialWrongNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} highlightChords={typingHighlightChords} activeNotes={allActiveNotes} wrongNotes={serialWrongNotes} />
             <MidiStatusView status={midiStatus} />
-            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
+            <TypingGame key={`${appMode}-${activeLayerName}`} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onChordHighlightChange={setTypingHighlightChords} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
             <DeviceConsole lines={deviceLines} />
           </>
         )}

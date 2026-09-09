@@ -1,3 +1,5 @@
+import type { KeymapEntry } from '../types'
+
 // HID Usage ID → 表示文字 の変換テーブル
 // ソース: gems/picoruby-scrimonia/mrblib/04_scrimonia_keycodes.rb
 
@@ -47,4 +49,24 @@ export function hidCodeToChar(hidCode: number, type: 'keycode' | 'modifier' | 'm
     return noteNumberToName(hidCode)
   }
   return HID_KEYCODE_TO_CHAR[hidCode] ?? `0x${hidCode.toString(16)}`
+}
+
+// マクロの text 中の空白・タブ・改行は鍵盤上のラベルでは見えないため、
+// 目に見える記号に置き換える。
+const MACRO_TEXT_DISPLAY: Record<string, string> = {
+  ' ': '␣',
+  '\t': '⇥',
+  '\n': '⏎',
+}
+
+function macroTextLabel(text: string): string {
+  return text.replace(/[ \t\n]/g, ch => MACRO_TEXT_DISPLAY[ch])
+}
+
+/** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text から組み立てる。 */
+export function entryLabel(entry: KeymapEntry): string {
+  if (entry.type === 'macro') {
+    return macroTextLabel(entry.text)
+  }
+  return hidCodeToChar(entry.hidCode, entry.type)
 }
