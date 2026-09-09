@@ -90,7 +90,8 @@ class Scrimonia
   def json_escape(str)
     result = ""
     i = 0
-    while i < str.bytesize
+    len = str.bytesize
+    while i < len
       byte = str.getbyte(i)
       result += escaped_json_char(byte) || str[i]
       i += 1

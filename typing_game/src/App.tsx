@@ -10,6 +10,7 @@ import { ScrimoniaSerial } from './lib/webSerial'
 import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
 import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
+import { parseKeymap } from './lib/keymapParser'
 
 const MAX_LOG_LINES = 200
 
@@ -38,6 +39,28 @@ function App() {
   const [appMode, setAppMode] = useState<GameMode>('en')
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
+
+  // localStorage には parse 済みの KeymapData をキャッシュしているため、
+  // パーサ自体を直した (今回の Macro/LayerChange 対応のような) 変更後も
+  // 古いブラウザには古い parse 結果が残ったままになる。raw keymap.rb も
+  // 保存してあるので、起動時に一度だけ現在のパーサで読み直して置き換える。
+  // raw が無い (RAW_KEYMAP_STORAGE_KEY 導入前に保存された) 場合や、
+  // 再パースが失敗した場合はキャッシュ済みの keymap をそのまま使う。
+  const reparsedRawKeymapRef = useRef(false)
+  useEffect(() => {
+    // PicoRuby.wasm の VM はモジュール単位で1個しか無く、2つの executeRuby を
+    // 並行実行すると互いの task が干渉して壊れる。StrictMode はこの effect を
+    // マウント時に2回実行するので、ref で2回目の parseKeymap 呼び出しを防ぐ。
+    if (!rawKeymap || reparsedRawKeymapRef.current) return
+    reparsedRawKeymapRef.current = true
+    parseKeymap(rawKeymap)
+      .then(data => {
+        setKeymap(data)
+        saveKeymapToStorage(data)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [serial] = useState(() => new ScrimoniaSerial())
   const [serialConnected, setSerialConnected] = useState(false)

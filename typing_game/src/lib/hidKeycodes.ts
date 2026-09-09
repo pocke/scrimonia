@@ -59,15 +59,15 @@ const MACRO_TEXT_DISPLAY: Record<string, string> = {
   '\n': '⏎',
   '\r': '␍',
 }
-const MACRO_TEXT_DISPLAY_PATTERN = new RegExp(`[${Object.keys(MACRO_TEXT_DISPLAY).join('')}]`, 'g')
+const LABEL_MAX_LENGTH = 10
 
-const MACRO_LABEL_MAX_LENGTH = 10
+function truncateLabel(label: string): string {
+  return label.length > LABEL_MAX_LENGTH ? label.slice(0, LABEL_MAX_LENGTH) + '…' : label
+}
 
 function macroTextLabel(text: string): string {
-  const replaced = text.replace(MACRO_TEXT_DISPLAY_PATTERN, ch => MACRO_TEXT_DISPLAY[ch])
-  return replaced.length > MACRO_LABEL_MAX_LENGTH
-    ? replaced.slice(0, MACRO_LABEL_MAX_LENGTH) + '…'
-    : replaced
+  const replaced = Array.from(text, ch => MACRO_TEXT_DISPLAY[ch] ?? ch).join('')
+  return truncateLabel(replaced)
 }
 
 /** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text / layerName から組み立てる。 */
@@ -76,7 +76,7 @@ export function entryLabel(entry: KeymapEntry): string {
     return macroTextLabel(entry.text)
   }
   if (entry.type === 'layer') {
-    return (entry.layerMode === 'switch' ? '→' : '⇩') + entry.layerName
+    return truncateLabel((entry.layerMode === 'switch' ? '→' : '⇩') + entry.layerName)
   }
   return hidCodeToChar(entry.hidCode, entry.type)
 }
