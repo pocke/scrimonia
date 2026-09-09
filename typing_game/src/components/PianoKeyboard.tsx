@@ -51,15 +51,20 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
     }
   }
 
-  // ラベル表示専用のマッピング。和音エントリ (例: cool.rb の C3 が11個のマクロ和音
-  // に相乗りする) を含めると1鍵にラベルが積み重なって潰れるため、単音キーだけに絞る。
-  const singleNoteMap = new Map<number, KeymapEntry[]>()
+  // ラベル表示用のマッピング。macro の和音 (例: cool.rb の C3 が50個のマクロ和音
+  // に相乗りする) を含めると1鍵にラベルが積み重なって潰れるため macro の和音だけ
+  // 除外する。macro 以外の和音 (keycode/layer の同時押し) は構成音それぞれに
+  // 積んで表示する (以前からの挙動)。
+  const keyLabelMap = new Map<number, KeymapEntry[]>()
   for (const entry of keymap) {
-    if (entry.noteNumbers.length !== 1) continue
-    const noteNum = entry.noteNumbers[0]
-    const existing = singleNoteMap.get(noteNum) ?? []
-    existing.push(entry)
-    singleNoteMap.set(noteNum, existing)
+    if (entry.noteNumbers.length > 1 && entry.type === 'macro') continue
+    // text が空の macro はラベルが空文字になり無意味なので出さない。
+    if (entry.type === 'macro' && entry.text.length === 0) continue
+    for (const noteNum of entry.noteNumbers) {
+      const existing = keyLabelMap.get(noteNum) ?? []
+      existing.push(entry)
+      keyLabelMap.set(noteNum, existing)
+    }
   }
 
   // 和音の点線を描画するためのレイアウトマップ
@@ -68,13 +73,16 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
     layoutMap.set(layout.noteNumber, layout)
   }
 
-  // macro 以外の和音 (keycode/layer の同時押し) は常時点線とラベルを描く。
-  // macro だけ highlightChords (次に打てるものだけ) に絞るのは、cool.rb に
-  // マクロ和音が50個あり、常時描くと鍵盤が読めなくなるため。keycode/layer の
-  // 同時押しはキーマップ全体でも数が少ないので、常時表示しても読める。
+  // macro 以外の和音 (keycode/layer の同時押し) は常時点線を描く。ラベルは
+  // keyLabelMap 側で構成音ごとに出るので、ここでは付けない (同じ中点に別の
+  // 和音が重なるキーマップだと、ラベルまで付けると重なって読めなくなるため)。
+  // macro の和音は highlightChords (次に打てるものだけ) に絞って点線+中点
+  // ラベルを描く。macro はキー単体のラベルを持たないので、ラベルはここでしか
+  // 出せない。cool.rb にはマクロ和音が50個あり、常時描くと鍵盤が読めなくなる
+  // ため、常時表示は非 macro の和音に限る。
   const staticChords: ChordHighlight[] = keymap
     .filter(e => e.noteNumbers.length > 1 && e.type !== 'macro')
-    .map(e => ({ noteNumbers: e.noteNumbers, label: entryLabel(e) }))
+    .map(e => ({ noteNumbers: e.noteNumbers, label: '' }))
   const chordsToRender = [...staticChords, ...(highlightChords ?? [])]
 
   const whiteKeys = layouts.filter(k => !k.isBlack)
@@ -89,7 +97,7 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
       {/* 白鍵 */}
       {whiteKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
-        const labelEntries = singleNoteMap.get(key.noteNumber)
+        const labelEntries = keyLabelMap.get(key.noteNumber)
         const isWrong = wrongSet.has(key.noteNumber)
         const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
@@ -128,7 +136,7 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
       {/* 黒鍵（白鍵の上に描画） */}
       {blackKeys.map(key => {
         const entries = noteMap.get(key.noteNumber)
-        const labelEntries = singleNoteMap.get(key.noteNumber)
+        const labelEntries = keyLabelMap.get(key.noteNumber)
         const isWrong = wrongSet.has(key.noteNumber)
         const isActive = activeSet.has(key.noteNumber)
         const isHighlighted = highlightSet.has(key.noteNumber)
@@ -190,19 +198,21 @@ export function PianoKeyboard({ keymap, highlightNotes, highlightChords, activeN
                 opacity={0.7}
               />
             ))}
-            <text
-              x={midX}
-              y={midY}
-              textAnchor="middle"
-              fontSize={11}
-              fontWeight="bold"
-              fill="#c7d2fe"
-              stroke="#1e1b4b"
-              strokeWidth={3}
-              paintOrder="stroke"
-            >
-              {chord.label}
-            </text>
+            {chord.label && (
+              <text
+                x={midX}
+                y={midY}
+                textAnchor="middle"
+                fontSize={11}
+                fontWeight="bold"
+                fill="#c7d2fe"
+                stroke="#1e1b4b"
+                strokeWidth={3}
+                paintOrder="stroke"
+              >
+                {chord.label}
+              </text>
+            )}
           </g>
         )
       })}

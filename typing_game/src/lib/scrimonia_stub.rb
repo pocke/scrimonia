@@ -87,16 +87,20 @@ class Scrimonia
     end
   end
 
-  # @picoruby/wasm-wasi の String はバイト単位でインデックスされる (multibyte
-  # 文字でも str[i] と str.getbyte(i) が同じ i を指す) ため、str[i] をそのまま
-  # 1バイト分の断片として使える。
+  # str[i] を1文字 (str が UTF8_STRING ビルドなら複数バイトのこともある) ずつ
+  # 取り出し、その先頭バイトで判定する。escaped_json_char が対象にする " \
+  # LF TAB CR と C0 制御文字はすべて 1 バイトの ASCII なので、multibyte 文字の
+  # 先頭バイト (0x80 以上) は必ず nil になり str[i] がそのまま素通りする。
+  # str[i] が1バイトぶんの文字列になる (str.bytesize == str.size) 現在の
+  # @picoruby/wasm-wasi 0.9.6 でも、str[i] が1文字ぶんの文字列になる
+  # UTF8_STRING ビルドでも、どちらでも正しく動く。
   def json_escape(str)
     result = ""
     i = 0
-    len = str.bytesize
+    len = str.size
     while i < len
-      byte = str.getbyte(i)
-      result += escaped_json_char(byte) || str[i]
+      c = str[i]
+      result += escaped_json_char(c.getbyte(0)) || c
       i += 1
     end
     result

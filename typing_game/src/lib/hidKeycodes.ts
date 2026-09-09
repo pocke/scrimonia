@@ -66,7 +66,7 @@ function truncateLabel(label: string): string {
   // 文字列 (絵文字など) だと途中で切って壊れる。Array.from はコードポイント
   // 単位で列挙するのでそれを避けられる。
   const chars = Array.from(label)
-  return chars.length > LABEL_MAX_LENGTH ? chars.slice(0, LABEL_MAX_LENGTH).join('') + '…' : label
+  return chars.length > LABEL_MAX_LENGTH ? chars.slice(0, LABEL_MAX_LENGTH - 1).join('') + '…' : label
 }
 
 function macroTextLabel(text: string): string {
@@ -80,7 +80,10 @@ export function entryLabel(entry: KeymapEntry): string {
     return macroTextLabel(entry.text)
   }
   if (entry.type === 'layer') {
-    return truncateLabel((entry.layerMode === 'switch' ? '→' : '⇩') + entry.layerName)
+    // gems/picoruby-scrimonia/mrblib/06_scrimonia_runner.rb の
+    // apply_layer_change は mode == :hold のときだけ hold_returns を記録し、
+    // それ以外は無条件に switch_layer するので、:hold 以外は switch 扱い。
+    return truncateLabel((entry.layerMode === 'hold' ? '⇩' : '→') + entry.layerName)
   }
   return hidCodeToChar(entry.hidCode, entry.type)
 }

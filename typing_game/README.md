@@ -54,6 +54,6 @@ npm run build
 PicoRuby.wasm を使って keymap.rb をブラウザ上で実行し、MIDI ノート → キーコードのマッピングデータを抽出する。
 
 - `gems/picoruby-scrimonia/mrblib/` の Ruby 定義（Note, Action, Notes, Keycodes）をブラウザ用スタブとして TypeScript 文字列で保持
-- `wasm_string_polyfill.rb` で `String#bytesize` を polyfill してから結合する。@picoruby/wasm-wasi 0.9.6 の String に bytesize が無く、Action::Macro の検証がそれを呼ぶため
+- `wasm_string_polyfill.rb` で `String#bytesize` を polyfill してから結合する。@picoruby/wasm-wasi 0.9.6 時点の String に bytesize が無く、Action::Macro の検証がそれを呼ぶため。polyfill 自体は `respond_to?` で存在確認してから定義するので、将来のバージョンでネイティブに実装されても上書きしない
 - `Scrimonia#add_layer` でマッピングデータを収集し、`Scrimonia#start!` で `JS.global` 経由で JavaScript に渡す
 - Vite が `@picoruby/wasm-wasi` の `picoruby.js` と `picoruby.wasm` を自動的にビルド出力に含める
