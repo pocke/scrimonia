@@ -62,8 +62,8 @@ function App() {
         setKeymap(data)
         saveKeymapToStorage(data)
       })
-      .catch(() => {
-        console.warn('Failed to re-parse the cached keymap.rb; keeping the previously cached parse result.')
+      .catch(e => {
+        console.warn('キャッシュ済み keymap.rb の再パースに失敗した。キャッシュ済みの parse 結果をそのまま使う。', e)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

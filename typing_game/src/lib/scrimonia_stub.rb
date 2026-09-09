@@ -87,6 +87,9 @@ class Scrimonia
     end
   end
 
+  # @picoruby/wasm-wasi の String はバイト単位でインデックスされる (multibyte
+  # 文字でも str[i] と str.getbyte(i) が同じ i を指す) ため、str[i] をそのまま
+  # 1バイト分の断片として使える。
   def json_escape(str)
     result = ""
     i = 0
