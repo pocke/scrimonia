@@ -54,8 +54,7 @@ class Scrimonia
   end
 
   # Action の型ごとに JSON の type と、type 固有フィールドの JSON 断片 (先頭に
-  # カンマを含む) を返す。keycode/modifier/midi の断片は hidCode フィールドを
-  # そのまま使うので、既存の出力 JSON は変わらない。
+  # カンマを含む) を返す。
   def action_json_fields(value)
     if value.is_a?(Action::Keycode)
       ["keycode", ',"hidCode":' + value.keycode.to_s]
@@ -72,21 +71,28 @@ class Scrimonia
     end
   end
 
-  # Macro#initialize が "\r\n" 以外の制御文字とマルチバイト文字を弾くため、
-  # エスケープ対象は " \ LF TAB CR の5バイトだけでよい。
+  CONTROL_HEX_DIGITS = "0123456789abcdef"
+
+  # " \ LF TAB CR は短縮形、他の C0 制御文字 (0x00-0x1F) は \u00XX でエスケープする。
+  # 対象外のバイトは nil を返す。
+  def escaped_json_char(byte)
+    case byte
+    when 0x22 then '\\"'
+    when 0x5C then '\\\\'
+    when 0x0A then '\\n'
+    when 0x09 then '\\t'
+    when 0x0D then '\\r'
+    when 0x00..0x1F
+      '\\u00' + CONTROL_HEX_DIGITS[(byte >> 4) & 0xF] + CONTROL_HEX_DIGITS[byte & 0xF]
+    end
+  end
+
   def json_escape(str)
     result = ""
     i = 0
     while i < str.bytesize
       byte = str.getbyte(i)
-      result += case byte
-        when 0x22 then '\\"'
-        when 0x5C then '\\\\'
-        when 0x0A then '\\n'
-        when 0x09 then '\\t'
-        when 0x0D then '\\r'
-        else str[i]
-        end
+      result += escaped_json_char(byte) || str[i]
       i += 1
     end
     result
@@ -113,7 +119,7 @@ class Scrimonia
           ',"type":"' + e[4] + '"' +
           e[5] + '}'
       end
-      layer_parts << '"' + name + '":[' + entry_strs.join(",") + ']'
+      layer_parts << '"' + json_escape(name) + '":[' + entry_strs.join(",") + ']'
     end
     json = "{" + layer_parts.join(",") + "}"
     JS.global.scrimoniaKeymapDataJson = json
