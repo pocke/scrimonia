@@ -11,6 +11,7 @@ export type KeymapEntry =
   // (フィールド名は keycode/modifier との共用のため hidCode のまま)。
   | (KeymapEntryBase & { type: 'midi'; hidCode: number })
   | (KeymapEntryBase & { type: 'macro'; text: string })
+  | (KeymapEntryBase & { type: 'layer'; layerName: string; layerMode: 'hold' | 'switch' })
 
 export type LayerKeymap = KeymapEntry[]
 export type KeymapData = Record<string, LayerKeymap>

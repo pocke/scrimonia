@@ -67,6 +67,8 @@ class Scrimonia
       ["midi", ',"hidCode":' + value.number.to_s]
     elsif value.is_a?(Action::Macro)
       ["macro", ',"text":"' + json_escape(value.text) + '"']
+    elsif value.is_a?(Action::LayerChange)
+      ["layer", ',"layerName":"' + json_escape(value.layer_name.to_s) + '","layerMode":"' + json_escape(value.mode.to_s) + '"']
     end
   end
 

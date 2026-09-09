@@ -32,14 +32,14 @@ function addHint(map: Map<string, NoteHint[]>, key: string, hint: NoteHint) {
 
 /**
  * KeymapEntry の配列から、文字 → ノート情報の逆引きテーブルを構築する。
- * modifier エントリはスキップする（タイピングゲームでは文字入力のみ対象）。
+ * modifier / layer エントリはスキップする（タイピングゲームでは文字入力のみ対象）。
  */
 export function buildReverseKeymap(keymap: LayerKeymap): ReverseKeymap {
   const byChar = new Map<string, NoteHint[]>()
   const macros: MacroHint[] = []
 
   for (const entry of keymap) {
-    if (entry.type === 'modifier') continue
+    if (entry.type === 'modifier' || entry.type === 'layer') continue
 
     const hint: NoteHint = {
       noteNumbers: entry.noteNumbers,

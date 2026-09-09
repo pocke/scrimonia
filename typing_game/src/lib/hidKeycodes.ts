@@ -63,10 +63,13 @@ function macroTextLabel(text: string): string {
   return text.replace(/[ \t\n]/g, ch => MACRO_TEXT_DISPLAY[ch])
 }
 
-/** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text から組み立てる。 */
+/** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text / layerName から組み立てる。 */
 export function entryLabel(entry: KeymapEntry): string {
   if (entry.type === 'macro') {
     return macroTextLabel(entry.text)
+  }
+  if (entry.type === 'layer') {
+    return (entry.layerMode === 'switch' ? '→' : '⇩') + entry.layerName
   }
   return hidCodeToChar(entry.hidCode, entry.type)
 }
