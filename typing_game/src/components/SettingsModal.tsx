@@ -5,6 +5,8 @@ import { KeymapUploader } from './KeymapUploader'
 interface Props {
   preferences: RomajiPreferences
   onPreferencesChange: (prefs: RomajiPreferences) => void
+  deviceSoundEnabled: boolean
+  onDeviceSoundChange: (enabled: boolean) => void
   onKeymapParsed: (data: KeymapData, rawContent: string) => void
   onClose: () => void
 }
@@ -23,7 +25,7 @@ const SETTINGS: SettingRow[] = [
   { label: 'じ行', key: 'ji',  options: [{ value: 'zi', label: 'zi' }, { value: 'ji', label: 'ji' }] },
 ]
 
-export function SettingsModal({ preferences, onPreferencesChange, onKeymapParsed, onClose }: Props) {
+export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEnabled, onDeviceSoundChange, onKeymapParsed, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
@@ -56,6 +58,19 @@ export function SettingsModal({ preferences, onPreferencesChange, onKeymapParsed
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-300">サウンド</h3>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deviceSoundEnabled}
+              onChange={e => onDeviceSoundChange(e.target.checked)}
+              className="accent-blue-500"
+            />
+            <span className="text-gray-200">デバイスで押した鍵盤の音を鳴らす</span>
+          </label>
         </div>
 
         {/* Keymap uploader */}
