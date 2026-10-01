@@ -32,15 +32,6 @@ class Scrimonia
             note_names << Note.name_for(k)
           end
         end
-        if value.is_a?(Action::Keycode)
-          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
-        elsif value.is_a?(Action::Modifier)
-          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
-        elsif value.is_a?(Note)
-          # MIDI パススルー (例: passthrough_mapping[n] = n)。
-          # hidCode フィールドに出力 MIDI ノート番号を流用する。
-          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
-        end
       elsif key.is_a?(Note)
         note_numbers = [key.number]
         note_names = [Note.name_for(key.number)]
@@ -50,16 +41,69 @@ class Scrimonia
           vel_min = key.velocity.first
           vel_max = key.velocity.last
         end
-        if value.is_a?(Action::Keycode)
-          entries << [note_numbers, note_names, vel_min, vel_max, "keycode", value.keycode]
-        elsif value.is_a?(Action::Modifier)
-          entries << [note_numbers, note_names, vel_min, vel_max, "modifier", value.modifier]
-        elsif value.is_a?(Note)
-          entries << [note_numbers, note_names, vel_min, vel_max, "midi", value.number]
-        end
+      else
+        next
       end
+
+      type, extra_json = action_json_fields(value)
+      next unless type
+
+      entries << [note_numbers, note_names, vel_min, vel_max, type, extra_json]
     end
     @layers[name.to_s] = entries
+  end
+
+  # Action の型ごとに JSON の type と、type 固有フィールドの JSON 断片 (先頭に
+  # カンマを含む) を返す。
+  def action_json_fields(value)
+    if value.is_a?(Action::Keycode)
+      ["keycode", ',"hidCode":' + value.keycode.to_s]
+    elsif value.is_a?(Action::Modifier)
+      ["modifier", ',"hidCode":' + value.modifier.to_s]
+    elsif value.is_a?(Note)
+      # MIDI パススルー (例: passthrough_mapping[n] = n)。
+      # hidCode フィールドに出力 MIDI ノート番号を流用する。
+      ["midi", ',"hidCode":' + value.number.to_s]
+    elsif value.is_a?(Action::Macro)
+      ["macro", ',"text":"' + json_escape(value.text) + '"']
+    elsif value.is_a?(Action::LayerChange)
+      ["layer", ',"layerName":"' + json_escape(value.layer_name.to_s) + '","layerMode":"' + json_escape(value.mode.to_s) + '"']
+    end
+  end
+
+  CONTROL_HEX_DIGITS = "0123456789abcdef"
+
+  # " \ LF TAB CR は短縮形、他の C0 制御文字 (0x00-0x1F) は \u00XX でエスケープする。
+  # 対象外のバイトは nil を返す。
+  def escaped_json_char(byte)
+    case byte
+    when 0x22 then '\\"'
+    when 0x5C then '\\\\'
+    when 0x0A then '\\n'
+    when 0x09 then '\\t'
+    when 0x0D then '\\r'
+    when 0x00..0x1F
+      '\\u00' + CONTROL_HEX_DIGITS[(byte >> 4) & 0xF] + CONTROL_HEX_DIGITS[byte & 0xF]
+    end
+  end
+
+  # str[i] を1文字 (str が UTF8_STRING ビルドなら複数バイトのこともある) ずつ
+  # 取り出し、その先頭バイトで判定する。escaped_json_char が対象にする " \
+  # LF TAB CR と C0 制御文字はすべて 1 バイトの ASCII なので、multibyte 文字の
+  # 先頭バイト (0x80 以上) は必ず nil になり str[i] がそのまま素通りする。
+  # str[i] が1バイトぶんの文字列になる (str.bytesize == str.size) 現在の
+  # @picoruby/wasm-wasi 0.9.6 でも、str[i] が1文字ぶんの文字列になる
+  # UTF8_STRING ビルドでも、どちらでも正しく動く。
+  def json_escape(str)
+    result = ""
+    i = 0
+    len = str.size
+    while i < len
+      c = str[i]
+      result += escaped_json_char(c.getbyte(0)) || c
+      i += 1
+    end
+    result
   end
 
   # JSON を手動で組み立てる（json gem の有無に依存しない）。
@@ -81,9 +125,9 @@ class Scrimonia
           ',"noteNames":' + names +
           ',"velocity":' + vel +
           ',"type":"' + e[4] + '"' +
-          ',"hidCode":' + e[5].to_s + '}'
+          e[5] + '}'
       end
-      layer_parts << '"' + name + '":[' + entry_strs.join(",") + ']'
+      layer_parts << '"' + json_escape(name) + '":[' + entry_strs.join(",") + ']'
     end
     json = "{" + layer_parts.join(",") + "}"
     JS.global.scrimoniaKeymapDataJson = json

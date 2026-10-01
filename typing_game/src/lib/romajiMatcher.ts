@@ -64,6 +64,23 @@ export function processKey(state: RomajiInputState, key: string): InputResult {
 }
 
 /**
+ * text を今の state から最後まで打ち切れるかを判定する。preferences で候補を
+ * 絞らない点が getNextExpectedChars と異なる。preference が "shi" でも
+ * processKey は chunk.candidates 全体を見て "si" を受理するため、マクロが
+ * 実際に打てるかどうかは preferences 抜きで判定する必要がある。
+ */
+export function canTypeSequence(state: RomajiInputState, text: string): boolean {
+  let current = state
+  for (let i = 0; i < text.length; i++) {
+    const result = processKey(current, text[i])
+    if (result.type === 'error') return false
+    if (result.type === 'complete' && i < text.length - 1) return false
+    current = result.nextState
+  }
+  return true
+}
+
+/**
  * Returns the set of valid next characters the user can type.
  * Used for piano keyboard highlighting.
  * When preferences are provided, only the preferred candidate is used

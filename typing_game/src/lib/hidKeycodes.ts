@@ -1,3 +1,5 @@
+import type { KeymapEntry } from '../types'
+
 // HID Usage ID → 表示文字 の変換テーブル
 // ソース: gems/picoruby-scrimonia/mrblib/04_scrimonia_keycodes.rb
 
@@ -47,4 +49,41 @@ export function hidCodeToChar(hidCode: number, type: 'keycode' | 'modifier' | 'm
     return noteNumberToName(hidCode)
   }
   return HID_KEYCODE_TO_CHAR[hidCode] ?? `0x${hidCode.toString(16)}`
+}
+
+// マクロの text 中の空白・タブ・改行・復帰は鍵盤上のラベルでは見えないため、
+// 目に見える記号に置き換える。
+const MACRO_TEXT_DISPLAY: Record<string, string> = {
+  ' ': '␣',
+  '\t': '⇥',
+  '\n': '⏎',
+  '\r': '␍',
+}
+const LABEL_MAX_LENGTH = 10
+
+function truncateLabel(label: string): string {
+  // string.slice は UTF-16 コードユニット単位なので、サロゲートペアを含む
+  // 文字列 (絵文字など) だと途中で切って壊れる。Array.from はコードポイント
+  // 単位で列挙するのでそれを避けられる。
+  const chars = Array.from(label)
+  return chars.length > LABEL_MAX_LENGTH ? chars.slice(0, LABEL_MAX_LENGTH - 1).join('') + '…' : label
+}
+
+function macroTextLabel(text: string): string {
+  const replaced = Array.from(text, ch => MACRO_TEXT_DISPLAY[ch] ?? ch).join('')
+  return truncateLabel(replaced)
+}
+
+/** 鍵盤上に表示するラベル文字列。type ごとに hidCode / text / layerName から組み立てる。 */
+export function entryLabel(entry: KeymapEntry): string {
+  if (entry.type === 'macro') {
+    return macroTextLabel(entry.text)
+  }
+  if (entry.type === 'layer') {
+    // gems/picoruby-scrimonia/mrblib/06_scrimonia_runner.rb の
+    // apply_layer_change は mode == :hold のときだけ hold_returns を記録し、
+    // それ以外は無条件に switch_layer するので、:hold 以外は switch 扱い。
+    return truncateLabel((entry.layerMode === 'hold' ? '⇩' : '→') + entry.layerName)
+  }
+  return hidCodeToChar(entry.hidCode, entry.type)
 }

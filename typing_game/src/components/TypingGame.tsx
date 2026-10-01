@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import type { LayerKeymap } from '../types'
-import { buildReverseKeymap } from '../lib/reverseKeymap'
+import type { ChordHighlight, LayerKeymap } from '../types'
+import { buildReverseKeymap, type MacroHint } from '../lib/reverseKeymap'
+import { entryLabel } from '../lib/hidKeycodes'
 import { sampleTexts } from '../lib/sampleTexts'
 import { sampleTextsJa, type JapaneseSampleText } from '../lib/sampleTextsJa'
 import {
@@ -9,6 +10,7 @@ import {
   processKey,
   getNextExpectedChars,
   getRemainingRomaji,
+  canTypeSequence,
 } from '../lib/romajiMatcher'
 import type { RomajiPreferences } from '../lib/romajiPreferences'
 
@@ -17,12 +19,18 @@ export type GameMode = 'en' | 'ja'
 interface Props {
   keymap: LayerKeymap
   onHighlightChange: (noteNumbers: number[] | undefined) => void
+  /** 次に押すと文字が打てるマクロ和音の一覧。ピアノに点線で表示するための通知。 */
+  onChordHighlightChange?: (chords: ChordHighlight[] | undefined) => void
   /** 期待文字と一致するキー入力があったときに呼ばれる。鍵盤を緑にするための通知。 */
   onRightInput?: () => void
   /** 期待文字と一致しないキー入力があったときに呼ばれる。鍵盤を赤くするための通知。 */
   onWrongInput?: () => void
   mode: GameMode
   romajiPreferences: RomajiPreferences
+}
+
+function macroHintToChordHighlight(macro: MacroHint): ChordHighlight {
+  return { noteNumbers: macro.noteNumbers, label: entryLabel({ ...macro, type: 'macro' }) }
 }
 
 interface GameState {
@@ -98,7 +106,7 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences }: Props) {
+export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
@@ -110,34 +118,33 @@ export function TypingGame({ keymap, onHighlightChange, onRightInput, onWrongInp
   useEffect(() => {
     if (game.status === 'finished') {
       onHighlightChange(undefined)
+      onChordHighlightChange?.(undefined)
       return
     }
 
     if (game.mode === 'en') {
+      const remaining = game.targetText.slice(game.currentIndex)
+      const matchedMacros = reverseKeymap.macros.filter(macro => remaining.startsWith(macro.text))
+
       const char = game.targetText[game.currentIndex]
-      if (char) {
-        const hints = reverseKeymap.get(char)
-        if (hints && hints.length > 0) {
-          onHighlightChange(hints.flatMap(h => h.noteNumbers))
-        } else {
-          onHighlightChange(undefined)
-        }
-      } else {
-        onHighlightChange(undefined)
-      }
+      const hints = char ? reverseKeymap.byChar.get(char) : undefined
+      const singleNotes = hints ? hints.flatMap(h => h.noteNumbers) : []
+      const allNotes = [...singleNotes, ...matchedMacros.flatMap(m => m.noteNumbers)]
+      onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
+      onChordHighlightChange?.(matchedMacros.length > 0 ? matchedMacros.map(macroHintToChordHighlight) : undefined)
     } else if (game.romajiState) {
+      const matchedMacros = reverseKeymap.macros.filter(macro => canTypeSequence(game.romajiState!, macro.text))
+
       const nextChars = getNextExpectedChars(game.romajiState, romajiPreferences)
-      if (nextChars.length > 0) {
-        const allNotes = nextChars.flatMap(ch => {
-          const hints = reverseKeymap.get(ch)
-          return hints ? hints.flatMap(h => h.noteNumbers) : []
-        })
-        onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
-      } else {
-        onHighlightChange(undefined)
-      }
+      const singleNotes = nextChars.flatMap(ch => {
+        const hints = reverseKeymap.byChar.get(ch)
+        return hints ? hints.flatMap(h => h.noteNumbers) : []
+      })
+      const allNotes = [...singleNotes, ...matchedMacros.flatMap(m => m.noteNumbers)]
+      onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
+      onChordHighlightChange?.(matchedMacros.length > 0 ? matchedMacros.map(macroHintToChordHighlight) : undefined)
     }
-  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, romajiPreferences])
+  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, onChordHighlightChange, romajiPreferences])
 
   // Elapsed time timer
   useEffect(() => {
