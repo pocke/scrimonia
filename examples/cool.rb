@@ -38,9 +38,9 @@ mp.add_layer :default, {
   E5   .with(velocity: soft) => KC_G,   # g
   E5   .with(velocity: hard) => KC_Q,   # q (低頻度)
   F5   => KC_D,
-  A5   => KC_Z,
-  B5   => KC_B,
-  C6   => KC_P,
+  G5   => KC_Z,
+  A5   => KC_B,
+  B5   => KC_P,
 
   # モーラ和音: 子音+母音を同時押し → 「子音→母音」の順で出力（弱打=頻出子音のみ）
   [C4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("na"),
