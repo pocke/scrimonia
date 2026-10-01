@@ -1,6 +1,8 @@
 export interface RomajiChunk {
   kana: string
   candidates: string[]
+  /** 元のテキストでこのチャンクの直前にスペースがあった */
+  spaceBefore?: boolean
 }
 
 interface RomajiEntry {
@@ -226,7 +228,31 @@ function nextKanaRequiresDoubleN(text: string, pos: number): boolean {
   return N_REQUIRES_DOUBLE.has(oneChar)
 }
 
+/**
+ * スペースは入力対象にせず、直後のチャンクの spaceBefore として残す。
+ * 「ん」「っ」の先読みがスペースをまたいで次の句の先頭を見るよう、
+ * スペースを除いたテキストからチャンクを作る。
+ */
 export function textToRomajiChunks(text: string): RomajiChunk[] {
+  const segments = text.split(' ')
+  const chunks = compactTextToRomajiChunks(segments.join(''))
+
+  const spaceOffsets = new Set<number>()
+  let offset = 0
+  for (const segment of segments.slice(0, -1)) {
+    offset += segment.length
+    spaceOffsets.add(offset)
+  }
+
+  let kanaOffset = 0
+  for (const chunk of chunks) {
+    if (kanaOffset > 0 && spaceOffsets.has(kanaOffset)) chunk.spaceBefore = true
+    kanaOffset += chunk.kana.length
+  }
+  return chunks
+}
+
+function compactTextToRomajiChunks(text: string): RomajiChunk[] {
   const chunks: RomajiChunk[] = []
   let pos = 0
 
@@ -278,7 +304,7 @@ export function textToRomajiChunks(text: string): RomajiChunk[] {
       continue
     }
 
-    // Non-kana characters (space, ascii, etc.) — pass through as-is
+    // Non-kana characters (ascii, etc.) — pass through as-is
     chunks.push({ kana: char, candidates: [char] })
     pos++
   }

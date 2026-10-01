@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { ChordHighlight, LayerKeymap } from '../types'
 import { buildReverseKeymap, type MacroHint } from '../lib/reverseKeymap'
 import { entryLabel } from '../lib/hidKeycodes'
@@ -335,9 +335,12 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
                     : 'text-white underline underline-offset-4 decoration-blue-400'
                 }
                 return (
-                  <span key={i} className={className}>
-                    {chunk.kana}
-                  </span>
+                  <Fragment key={i}>
+                    {chunk.spaceBefore && ' '}
+                    <span className={className}>
+                      {chunk.kana}
+                    </span>
+                  </Fragment>
                 )
               })}
             </div>
