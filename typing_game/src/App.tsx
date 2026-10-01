@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChordHighlight, KeymapData } from './types'
+import type { ChordHighlight, KeymapData, LayerKeymap } from './types'
 import { KeymapUploader } from './components/KeymapUploader'
 import { KeymapSender } from './components/KeymapSender'
 import { PianoKeyboard } from './components/PianoKeyboard'
@@ -11,6 +11,9 @@ import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
 import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
 import { parseKeymap } from './lib/keymapParser'
+import { PianoSynth } from './lib/pianoSynth'
+import { loadDeviceSoundEnabled, saveDeviceSoundEnabled } from './lib/deviceSoundPreference'
+import { isMidiPassthroughNote } from './lib/midiPassthrough'
 
 const MAX_LOG_LINES = 200
 
@@ -29,6 +32,10 @@ function loadKeymapFromStorage(): KeymapData | null {
 
 function saveKeymapToStorage(data: KeymapData): void {
   localStorage.setItem(KEYMAP_STORAGE_KEY, JSON.stringify(data))
+}
+
+function selectLayer(keymap: KeymapData | null, name: string): LayerKeymap | null {
+  return keymap ? (keymap[name] ?? keymap['default'] ?? Object.values(keymap)[0]) : null
 }
 
 function App() {
@@ -88,20 +95,36 @@ function App() {
 
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
-  const { status: midiStatus, activeNotes: midiActiveNotes } = useMidiInput()
+  // Web MIDI とシリアルで同じ PianoSynth を共有する (AudioContext は 1 つだけ作る)。
+  const [synth] = useState(() => new PianoSynth())
+  useEffect(() => () => synth.destroy(), [synth])
+  const { status: midiStatus, activeNotes: midiActiveNotes } = useMidiInput(synth)
+
+  const [deviceSoundEnabled, setDeviceSoundEnabled] = useState(loadDeviceSoundEnabled)
+  const deviceSoundEnabledRef = useRef(deviceSoundEnabled)
+  const keymapRef = useRef<KeymapData | null>(keymap)
+  const activeLayerNameRef = useRef('default')
+  const serialSoundNotesRef = useRef<Set<number>>(new Set())
+
+  // releaseAll は Web MIDI 経由の音まで止めるので、シリアル経由で鳴らした音だけ止める。
+  const stopSerialSounds = useCallback(() => {
+    for (const note of serialSoundNotesRef.current) synth.noteOff(note)
+    serialSoundNotesRef.current.clear()
+  }, [synth])
 
   // 接続状態の変更点で WebSerial 経由の押下中ノートと判定結果を掃除する。
   // 切断後は note_off が届かないので、放置すると鍵盤が光ったままになる。
   const handleSerialConnectedChange = useCallback((connected: boolean) => {
     setSerialConnected(connected)
     if (!connected) {
+      stopSerialSounds()
       serialActiveSetRef.current.clear()
       serialRightSetRef.current.clear()
       serialWrongSetRef.current.clear()
       setSerialRightNotes([])
       setSerialWrongNotes([])
     }
-  }, [])
+  }, [stopSerialSounds])
 
   // タイピング側の正誤判定を受けて、現在押下中の全 serial ノートを right か
   // wrong のセットに昇格させる。文字とノートの厳密な対応 (velocity 条件で
@@ -146,12 +169,25 @@ function App() {
     })
     const msg = parseDeviceMessage(line)
     if (msg?.type === 'layer_change') {
+      activeLayerNameRef.current = msg.layer
       setActiveLayerName(msg.layer)
     } else if (msg?.type === 'note_on') {
       // 描画はしないので state 更新不要。判定が来た時の検索用に Set だけ追跡する。
       serialActiveSetRef.current.add(msg.note)
+      if (
+        deviceSoundEnabledRef.current &&
+        !isMidiPassthroughNote(
+          selectLayer(keymapRef.current, activeLayerNameRef.current),
+          msg.note,
+          msg.velocity,
+        )
+      ) {
+        synth.noteOn(msg.note, msg.velocity)
+        serialSoundNotesRef.current.add(msg.note)
+      }
     } else if (msg?.type === 'note_off') {
       serialActiveSetRef.current.delete(msg.note)
+      if (serialSoundNotesRef.current.delete(msg.note)) synth.noteOff(msg.note)
       if (serialRightSetRef.current.delete(msg.note)) {
         setSerialRightNotes(Array.from(serialRightSetRef.current))
       }
@@ -159,7 +195,7 @@ function App() {
         setSerialWrongNotes(Array.from(serialWrongSetRef.current))
       }
     }
-  }, [])
+  }, [synth])
 
   // 緑で塗るノート: Web MIDI 経由で直接届いている押下 (passthrough や直接接続)
   // と、WebSerial 経由で文字判定が「正解」と確定したもの。「弾いただけ・判定
@@ -170,9 +206,11 @@ function App() {
     ? midiActiveNotes
     : Array.from(new Set([...midiActiveNotes, ...serialRightNotes]))
 
-  const activeLayer = keymap
-    ? (keymap[activeLayerName] ?? keymap['default'] ?? Object.values(keymap)[0])
-    : null
+  useEffect(() => {
+    keymapRef.current = keymap
+  }, [keymap])
+
+  const activeLayer = selectLayer(keymap, activeLayerName)
 
   const handleKeymapParsed = (data: KeymapData, rawContent: string) => {
     manualKeymapUploadRef.current = true
@@ -185,6 +223,13 @@ function App() {
   const handlePreferencesChange = (prefs: RomajiPreferences) => {
     setRomajiPreferences(prefs)
     savePreferences(prefs)
+  }
+
+  const handleDeviceSoundChange = (enabled: boolean) => {
+    setDeviceSoundEnabled(enabled)
+    deviceSoundEnabledRef.current = enabled
+    saveDeviceSoundEnabled(enabled)
+    if (!enabled) stopSerialSounds()
   }
 
   return (
@@ -253,6 +298,8 @@ function App() {
         <SettingsModal
           preferences={romajiPreferences}
           onPreferencesChange={handlePreferencesChange}
+          deviceSoundEnabled={deviceSoundEnabled}
+          onDeviceSoundChange={handleDeviceSoundChange}
           onKeymapParsed={handleKeymapParsed}
           onClose={() => setShowSettings(false)}
         />
