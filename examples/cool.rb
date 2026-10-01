@@ -93,6 +93,21 @@ mp.add_layer :default, {
   [F5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("du"),
   [F5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("de"),
   [F5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("do"),
+  [G5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("za"),
+  [G5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("zi"),
+  [G5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("zu"),
+  [G5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("ze"),
+  [G5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("zo"),
+  [A5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ba"),
+  [A5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("bi"),
+  [A5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("bu"),
+  [A5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("be"),
+  [A5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("bo"),
+  [B5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("pa"),
+  [B5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("pi"),
+  [B5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("pu"),
+  [B5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("pe"),
+  [B5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("po"),
 
   # 修飾キー (押している間だけ効く)
   Cs3  => KC_LCTL,   # Ctrl
