@@ -51,9 +51,8 @@ function App() {
   // 呼ばれた) ら、起動時の再パース結果は古い方の結果になりうるので捨てる。
   const manualKeymapUploadRef = useRef(false)
   useEffect(() => {
-    // PicoRuby.wasm の VM はモジュール単位で1個しか無く、2つの executeRuby を
-    // 並行実行すると互いの task が干渉して壊れる。StrictMode はこの effect を
-    // マウント時に2回実行するので、ref で2回目の parseKeymap 呼び出しを防ぐ。
+    // StrictMode はこの effect をマウント時に2回実行するので、ref で2回目の
+    // parseKeymap 呼び出しを防ぐ。
     if (!rawKeymap || reparsedRawKeymapRef.current) return
     reparsedRawKeymapRef.current = true
     parseKeymap(rawKeymap)

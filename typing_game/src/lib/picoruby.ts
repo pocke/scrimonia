@@ -4,19 +4,15 @@ import type createModuleType from '@picoruby/wasm-wasi/picoruby.js'
 
 type EmscriptenModule = Awaited<ReturnType<typeof createModuleType>>
 
-let modulePromise: Promise<EmscriptenModule> | null = null
-
-function loadModule(): Promise<EmscriptenModule> {
-  if (modulePromise) return modulePromise
-
-  modulePromise = (async () => {
-    const { default: createModule } = await import(
-      /* @vite-ignore */ '@picoruby/wasm-wasi/picoruby.js'
-    )
-    return await createModule()
-  })()
-
-  return modulePromise
+// モジュールを使い回して picorb_init を呼び直すと、mrbc_init がクラスと
+// メソッドを初期化する一方で、gem の読み込み済みフラグ (C の static 変数) は
+// 残る。そのため 2 回目以降は gem の初期化が飛ばされ、respond_to? や require
+// が消えた VM になるので、モジュールは使い回さない。
+async function loadModule(): Promise<EmscriptenModule> {
+  const { default: createModule } = await import(
+    /* @vite-ignore */ '@picoruby/wasm-wasi/picoruby.js'
+  )
+  return await createModule()
 }
 
 /**
