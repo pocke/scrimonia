@@ -1,12 +1,12 @@
 require 'scrimonia'
-include Scrimonia::Notes
-include Scrimonia::Keycodes
+include Scrimonia::Notes # steep:ignore NoMethod
+include Scrimonia::Keycodes # steep:ignore NoMethod
 
 # 彩りダイアトニック（採用） / 37鍵 — 文字 + モーラ和音Macro + 修飾 + 空白/編集 + :num(トグル)
 mp = Scrimonia.new
 soft = 1..70
 hard = 71..127
-LAYER_NUM = Scrimonia::Action::LayerChange.new(:num, :switch)
+layer_num = Scrimonia::Action::LayerChange.new(:num, :switch)
 
 mp.add_layer :default, {
   # 母音 (velocity判定なし・低音5音)
@@ -98,7 +98,7 @@ mp.add_layer :default, {
   Fs3  => KC_LGUI,   # Gui
 
   # レイヤー(トグル) / 空白 / 編集
-  Gs3  => LAYER_NUM,   # 押すたび :num をトグル
+  Gs3  => layer_num,   # 押すたび :num をトグル
   As3  => KC_SPC,   # ␣
   B3   => KC_ENTER,   # ⏎
   Cs4  => KC_BSPC,   # ⌫
