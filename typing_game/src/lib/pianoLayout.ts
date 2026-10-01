@@ -39,8 +39,8 @@ export interface KeyLayout {
  * 指定されたノート範囲のピアノ鍵盤レイアウトを計算する。
  *
  * デフォルトでは C3〜C5 の 25 鍵盤を表示する。指定された範囲がこれに収まる
- * 場合は固定で 25 鍵を返す。収まらない場合はオクターブ境界 (C〜B) に
- * 切り上げ/切り下げて拡張する。
+ * 場合は固定で 25 鍵を返す。収まらない場合は、左端を C に切り下げ、
+ * 右端を C に切り上げて拡張する。
  */
 export function buildKeyboardLayout(minNote: number, maxNote: number): KeyLayout[] {
   let startNote: number
@@ -49,8 +49,8 @@ export function buildKeyboardLayout(minNote: number, maxNote: number): KeyLayout
     startNote = DEFAULT_MIN_NOTE
     endNote = DEFAULT_MAX_NOTE
   } else {
-    startNote = minNote - (minNote % 12)
-    endNote = maxNote + (11 - (maxNote % 12))
+    startNote = Math.floor(minNote / 12) * 12
+    endNote = Math.ceil(maxNote / 12) * 12
   }
 
   const layouts: KeyLayout[] = []
@@ -71,20 +71,7 @@ export function buildKeyboardLayout(minNote: number, maxNote: number): KeyLayout
       // オクターブ境界でない C の場合も right
       const shape = WHITE_KEY_SHAPES[whiteKeyIndex]
 
-      // 端のキーはノッチ不要な場合がある。endNote が C のケース
-      // (25 鍵デフォルトで起こる) は元実装に無かったため、'right' を 'full'
-      // に倒すパターンを追加している。
-      let actualShape = shape
-      if (note === startNote) {
-        actualShape = shape === 'both' ? 'left' : shape === 'right' ? 'full' : shape
-      }
-      if (note === endNote) {
-        actualShape =
-          shape === 'both' ? 'right'
-          : shape === 'left' ? 'full'
-          : shape === 'right' ? 'full'
-          : shape
-      }
+      const actualShape = note === startNote || note === endNote ? 'full' : shape
 
       layouts.push({
         noteNumber: note,
