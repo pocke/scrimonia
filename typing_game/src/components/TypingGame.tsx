@@ -13,6 +13,9 @@ import {
   canTypeSequence,
 } from '../lib/romajiMatcher'
 import type { RomajiPreferences } from '../lib/romajiPreferences'
+import type { PianoSynth } from '../lib/pianoSynth'
+import { planPreview, textToCharChunks, type PreviewPlan } from '../lib/previewPlanner'
+import { playPreview } from '../lib/previewPlayer'
 
 export type GameMode = 'en' | 'ja'
 
@@ -27,6 +30,7 @@ interface Props {
   onWrongInput?: () => void
   mode: GameMode
   romajiPreferences: RomajiPreferences
+  synth: PianoSynth
 }
 
 function macroHintToChordHighlight(macro: MacroHint): ChordHighlight {
@@ -107,13 +111,38 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences }: Props) {
+export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences, synth }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const reverseKeymap = useMemo(() => buildReverseKeymap(keymap), [keymap])
+
+  const [playingPlan, setPlayingPlan] = useState<PreviewPlan | null>(null)
+  const stopPreviewRef = useRef<(() => void) | null>(null)
+
+  const stopPreview = useCallback(() => {
+    stopPreviewRef.current?.()
+    stopPreviewRef.current = null
+    setPlayingPlan(null)
+  }, [])
+
+  const preview = useMemo(() => {
+    const chunks = game.mode === 'ja'
+      ? createInitialState(game.targetText).chunks
+      : textToCharChunks(game.targetText)
+    return { chunks, plan: planPreview(keymap, chunks, romajiPreferences) }
+  }, [keymap, game.mode, game.targetText, romajiPreferences])
+
+  // お題・キーマップ・流儀が変わって plan が作り直されたとき、アンマウント時に止める。
+  // playingPlan は plan の同一性で比べるので、ここでは setState しない。
+  useEffect(() => () => {
+    stopPreviewRef.current?.()
+    stopPreviewRef.current = null
+  }, [preview])
+
+  const previewing = playingPlan === preview.plan
 
   // Highlight notes for the next expected key
   useEffect(() => {
@@ -176,6 +205,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     if (key.length !== 1) return
 
     e.preventDefault()
+    stopPreview()
 
     if (game.mode === 'en') {
       // English mode: existing logic
@@ -257,7 +287,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
         }
       })
     }
-  }, [game.status, game.mode, triggerShake, onRightInput, onWrongInput])
+  }, [game.status, game.mode, triggerShake, onRightInput, onWrongInput, stopPreview])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -277,6 +307,20 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
   const handleNext = () => {
     setGame(createNewGameState(game.mode))
     setElapsedMs(0)
+  }
+
+  const handleTogglePreview = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.blur()
+    if (previewing) {
+      stopPreview()
+      return
+    }
+    if (!preview.plan.ok) return
+    setPlayingPlan(preview.plan)
+    stopPreviewRef.current = playPreview(synth, preview.plan.strokes, () => {
+      stopPreviewRef.current = null
+      setPlayingPlan(null)
+    })
   }
 
   const handleSelectPoem = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -303,16 +347,30 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   return (
     <div ref={containerRef} tabIndex={-1} className="outline-none space-y-6">
+      <div className="flex items-center gap-3">
       {game.mode === 'ja' && (
         <select
           value={selectedPoemIndex}
           onChange={handleSelectPoem}
-          className="w-full bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
+          className="min-w-0 flex-1 bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
         >
           {sampleTextsJa.map((t, i) => (
             <option key={i} value={i}>{`${i + 1}. ${t.display}`}</option>
           ))}
         </select>
+      )}
+      <button
+        onClick={handleTogglePreview}
+        disabled={!previewing && !preview.plan.ok}
+        className="shrink-0 px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-white text-sm disabled:opacity-40 disabled:hover:bg-gray-700"
+      >
+        {previewing ? '■ 停止' : '▶ 音をプレビュー'}
+      </button>
+      </div>
+      {!preview.plan.ok && (
+        <p className="text-sm text-red-400">
+          このキーマップでは「{preview.chunks[preview.plan.chunkIndex]?.kana}」を入力できない
+        </p>
       )}
       {/* お題テキスト */}
       <div

@@ -27,5 +27,8 @@ jobs:
       # ESLint。設定は typing_game/eslint.config.js。
       - run: npm run lint
 
+      # vitest でユニットテストを実行する。
+      - run: npm test
+
       # tsc -b (型検査) + vite build (バンドル) を順に実行する。
       - run: npm run build
