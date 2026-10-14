@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_RELEASE_SEC,
   MAX_RELEASE_SEC,
@@ -20,6 +20,10 @@ describe('releaseTimePreference', () => {
     })
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('未保存なら既定値を返す', () => {
     expect(loadReleaseSec()).toBe(DEFAULT_RELEASE_SEC)
   })
@@ -34,6 +38,13 @@ describe('releaseTimePreference', () => {
     expect(loadReleaseSec()).toBe(DEFAULT_RELEASE_SEC)
     store.set(KEY, String(MAX_RELEASE_SEC + 1))
     expect(loadReleaseSec()).toBe(DEFAULT_RELEASE_SEC)
+  })
+
+  it('範囲の両端の保存値はそのまま返す', () => {
+    store.set(KEY, String(MIN_RELEASE_SEC))
+    expect(loadReleaseSec()).toBe(MIN_RELEASE_SEC)
+    store.set(KEY, String(MAX_RELEASE_SEC))
+    expect(loadReleaseSec()).toBe(MAX_RELEASE_SEC)
   })
 
   it('範囲内の保存値はそのまま返す', () => {
