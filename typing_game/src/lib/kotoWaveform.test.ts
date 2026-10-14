@@ -13,6 +13,33 @@ function rms(samples: Float32Array, from: number, to: number): number {
   return Math.sqrt(sum / (to - from))
 }
 
+function amplitudeAt(samples: Float32Array, frequency: number, startSec: number, length: number): number {
+  const start = Math.floor(SAMPLE_RATE * startSec)
+  let re = 0
+  let im = 0
+  for (let i = 0; i < length; i++) {
+    const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / length)
+    const phase = (2 * Math.PI * frequency * i) / SAMPLE_RATE
+    re += samples[start + i] * w * Math.cos(phase)
+    im -= samples[start + i] * w * Math.sin(phase)
+  }
+  return Math.hypot(re, im)
+}
+
+// 非調和性で k·f0 からわずかにずれるので、近傍の最大値を取る
+function harmonicAmplitude(samples: Float32Array, f0: number, k: number, startSec: number, length: number): number {
+  let best = 0
+  for (let cents = -15; cents <= 15; cents += 3) {
+    const f = k * f0 * Math.pow(2, cents / 1200)
+    best = Math.max(best, amplitudeAt(samples, f, startSec, length))
+  }
+  return best
+}
+
+function harmonicDb(samples: Float32Array, f0: number, k: number, startSec: number, length: number): number {
+  return 20 * Math.log10(harmonicAmplitude(samples, f0, k, startSec, length) / harmonicAmplitude(samples, f0, 1, startSec, length))
+}
+
 // 自己相関が最大になるラグから基本周波数を推定する (放物線補間つき)
 function estimateFrequency(samples: Float32Array, expected: number): number {
   const start = Math.floor(SAMPLE_RATE * 0.05)
@@ -70,15 +97,39 @@ describe('renderKotoWaveform', () => {
     expect(low.length).toBeGreaterThan(high.length)
   })
 
-  it.each([[84, 1.62], [96, 1.2]])('MIDI %i の実効 T60 が設計値 %f 秒の ±30% に収まる', (note, designed) => {
-    const wave = renderKotoWaveform(midiToHz(note), SAMPLE_RATE)
-    const window = Math.floor(SAMPLE_RATE * 0.05)
-    const early = Math.floor(SAMPLE_RATE * 0.1)
-    const late = Math.floor(SAMPLE_RATE * 0.3)
-    const dropDb = 20 * Math.log10(rms(wave, early, early + window) / rms(wave, late, late + window))
-    const effectiveT60 = 60 * 0.2 / dropDb
-    expect(effectiveT60).toBeGreaterThan(designed * 0.7)
-    expect(effectiveT60).toBeLessThan(designed * 1.3)
+  it.each([[84, 1.62], [96, 1.2]])('MIDI %i の基本波の実効 T60 が設計値 %f 秒の ±40% に収まる', (note, designed) => {
+    const f0 = midiToHz(note)
+    const wave = renderKotoWaveform(f0, SAMPLE_RATE)
+    // うなりで振幅が最大 ±30% 揺れるので、窓ごとの基本波振幅 (dB) を最小二乗直線で回帰する。揺れの分だけ傾きがずれるため許容幅は ±40%
+    const length = 2048
+    const times = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    const dbs = times.map(t => 20 * Math.log10(harmonicAmplitude(wave, f0, 1, t, length)))
+    const meanT = times.reduce((a, b) => a + b) / times.length
+    const meanDb = dbs.reduce((a, b) => a + b) / dbs.length
+    let num = 0
+    let den = 0
+    times.forEach((t, i) => {
+      num += (t - meanT) * (dbs[i] - meanDb)
+      den += (t - meanT) ** 2
+    })
+    const effectiveT60 = -60 / (num / den)
+    expect(effectiveT60).toBeGreaterThan(designed * 0.6)
+    expect(effectiveT60).toBeLessThan(designed * 1.4)
+  })
+
+  it('MIDI 55 の 0.5 秒付近で第 8 倍音以上が基本波より 30dB 以上小さい', () => {
+    const f0 = midiToHz(55)
+    const wave = renderKotoWaveform(f0, SAMPLE_RATE)
+    for (let k = 8; k <= 12; k++) {
+      expect(harmonicDb(wave, f0, k, 0.5, 4800)).toBeLessThan(-30)
+    }
+  })
+
+  it('MIDI 55 の立ち上がりは第 5〜8 倍音のどれかが基本波から -25dB 以内にある', () => {
+    const f0 = midiToHz(55)
+    const wave = renderKotoWaveform(f0, SAMPLE_RATE)
+    const dbs = [5, 6, 7, 8].map(k => harmonicDb(wave, f0, k, 0.02, 1024))
+    expect(Math.max(...dbs)).toBeGreaterThan(-25)
   })
 
   it.each([96, 108])('MIDI %i の後半に直流成分が残らない', note => {
@@ -94,5 +145,14 @@ describe('renderKotoWaveform', () => {
     const a = renderKotoWaveform(440, SAMPLE_RATE)
     const b = renderKotoWaveform(440, SAMPLE_RATE)
     expect(Array.from(a)).toEqual(Array.from(b))
+  })
+
+  it.each([36, 55, 96])('MIDI %i の先頭サンプルがフルスケールに跳ばない', note => {
+    const wave = renderKotoWaveform(midiToHz(note), SAMPLE_RATE)
+    expect(Math.abs(wave[0])).toBeLessThan(0.05)
+  })
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('周波数が %f のとき RangeError を投げる', frequency => {
+    expect(() => renderKotoWaveform(frequency, SAMPLE_RATE)).toThrow(RangeError)
   })
 })

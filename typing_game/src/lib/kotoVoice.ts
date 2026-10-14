@@ -8,8 +8,7 @@ const LOWPASS_MAX_HZ = 14000
 const LOWPASS_Q_DB = -3
 
 const BODY_RESONANCES = [
-  { frequency: 250, q: 1.2, gain: 3 },
-  { frequency: 1400, q: 1.5, gain: 2.5 },
+  { frequency: 1400, q: 1.5, gain: 2 },
 ]
 
 const PITCH_BEND_MAX_CENTS = 10

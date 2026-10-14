@@ -1,6 +1,5 @@
-// 拡張 Karplus-Strong 法による撥弦音の合成。
-// Jaffe & Smith 1983, "Extensions of the Karplus-Strong Plucked-String Algorithm"
-// https://ccrma.stanford.edu/~jos/pasp/Karplus_Strong_Algorithm.html
+// モーダル (加算) 合成による撥弦音。弦の振動を倍音ごとの減衰する正弦波の和で表す。
+// 非調和性を持つ弦の倍音周波数: Fletcher 1964, "Normal Vibration Frequencies of a Stiff Piano String"
 
 const LOW_NOTE = 48
 const HIGH_NOTE = 96
@@ -9,17 +8,30 @@ const HIGH_NOTE_T60_SEC = 1.2
 const MAX_DURATION_SEC = 4
 const TAIL_SEC = 0.2
 
-const PLUCK_POSITION = 0.12
-const EXCITATION_SMOOTHING = 0.5
-const CLICK_SEC = 0.004
-const CLICK_GAIN = 0.35
-const NOISE_SEED = 0x6b6f746f
+// 弦の非調和性 B。倍音 k の周波数は k·f0·sqrt((1 + B·k²) / (1 + B))
+const INHARMONICITY = 0.0001
+const MAX_FREQUENCY_RATIO = 0.9
+// 弦の長さを 1 としたときの撥弦位置 β。倍音 k の初期振幅は |sin(kπβ)|
+const PLUCK_POSITION = 0.08
+// 倍音 k の初期振幅を 1/k^p で減らす。爪が硬いほど小さい
+const PLUCK_HARDNESS = 1.4
+// 周波数依存の減衰。1/T60 = 1/T60_基本波 + DAMPING_PER_KHZ2 · ((f / 1kHz)² - (f0 / 1kHz)²)。
+// 基本波の T60 は高音でも decayTimeSec の値のままにする
+const DAMPING_PER_KHZ2 = 0.9
+const CUTOFF_AMPLITUDE = Math.pow(10, -90 / 20)
 
-// 丸め誤差でループゲインが 1 を超えて発散しないための上限
-const MAX_LOOP_GAIN = 0.99999
-// d → 0 で allpass の係数 C → 1 になり極が z = -1 に近づいて過渡応答が長引くので、d を [0.1, 1.1) に収める
-const MIN_FRACTIONAL_DELAY = 0.1
-const AVERAGING_WEIGHT = 0.5
+// 弦の水平・垂直方向の振動のずれによるうなり。同じ倍音列をもう 1 組足す
+const BEAT_DETUNE_CENTS = 0.7
+const BEAT_AMPLITUDE_RATIO = 0.3
+const BEAT_T60_RATIO = 1.3
+
+// 先頭で振幅が 0 から跳ばないようにする立ち上がり
+const ATTACK_SEC = 0.001
+const CLICK_SEC = 0.0025
+const CLICK_GAIN = 0.1
+const CLICK_CENTER_HZ = 4000
+const CLICK_Q = 1
+const NOISE_SEED = 0x6b6f746f
 
 function midiFromFrequency(frequency: number): number {
   return 69 + 12 * Math.log2(frequency / 440)
@@ -46,94 +58,107 @@ function createRandom(seed: number): () => number {
   }
 }
 
-function createExcitation(length: number, random: () => number): Float32Array<ArrayBuffer> {
-  const smoothed = new Float32Array(length)
-  let prev = 0
-  for (let i = 0; i < length; i++) {
-    prev = EXCITATION_SMOOTHING * prev + (1 - EXCITATION_SMOOTHING) * random()
-    smoothed[i] = prev
-  }
+function addDecayingSine(
+  out: Float32Array,
+  amplitude: number,
+  frequency: number,
+  t60Sec: number,
+  sampleRate: number,
+): void {
+  const omega = 2 * Math.PI * frequency / sampleRate
+  // 1 サンプルあたりの振幅の減衰率 d。d^(t60 · sampleRate) = 10^-3
+  const decay = Math.pow(10, -3 / (t60Sec * sampleRate))
+  const rotCos = decay * Math.cos(omega)
+  const rotSin = decay * Math.sin(omega)
+  const audibleSamples = Math.log(CUTOFF_AMPLITUDE / amplitude) / Math.log(decay)
+  const length = Math.min(out.length, Math.ceil(audibleSamples))
 
-  // 弦の端から β の位置を弾くと、基本周波数の 1/β 倍の整数倍の倍音が消える。
-  // 遅延線を一周する巡回くし形フィルタ x[n] - x[n - βN] で表す。
-  // https://ccrma.stanford.edu/~jos/pasp/Extended_Karplus_Strong_Algorithm.html
-  const combLag = Math.max(1, Math.round(PLUCK_POSITION * length))
-  const combed = new Float32Array(length)
-  let mean = 0
-  for (let i = 0; i < length; i++) {
-    combed[i] = smoothed[i] - smoothed[(i - combLag + length) % length]
-    mean += combed[i]
+  let re = amplitude
+  let im = 0
+  for (let n = 0; n < length; n++) {
+    out[n] += re
+    const nextRe = rotCos * re - rotSin * im
+    im = rotSin * re + rotCos * im
+    re = nextRe
   }
-  mean /= length
-  for (let i = 0; i < length; i++) combed[i] -= mean
-  return combed
+}
+
+function addModes(
+  out: Float32Array,
+  frequency: number,
+  sampleRate: number,
+  amplitudeScale: number,
+  t60Scale: number,
+): void {
+  const fundamentalT60 = decayTimeSec(frequency) * t60Scale
+  const maxFrequency = sampleRate / 2 * MAX_FREQUENCY_RATIO
+  for (let k = 1; Math.pow(k, -PLUCK_HARDNESS) >= CUTOFF_AMPLITUDE; k++) {
+    const modeFrequency = k * frequency * Math.sqrt((1 + INHARMONICITY * k * k) / (1 + INHARMONICITY))
+    if (modeFrequency > maxFrequency) break
+    const amplitude = Math.abs(Math.sin(k * Math.PI * PLUCK_POSITION)) / Math.pow(k, PLUCK_HARDNESS)
+    const khz = modeFrequency / 1000
+    const fundamentalKhz = frequency / 1000
+    const t60 = 1 / (1 / fundamentalT60 + DAMPING_PER_KHZ2 * (khz * khz - fundamentalKhz * fundamentalKhz))
+    addDecayingSine(out, amplitude * amplitudeScale, modeFrequency, t60, sampleRate)
+  }
+}
+
+// 爪が弦に当たる瞬間の、CLICK_CENTER_HZ 付近の帯域ノイズ (バンドパスは https://www.w3.org/TR/audio-eq-cookbook/ の式)
+function addClick(out: Float32Array, sampleRate: number): void {
+  const random = createRandom(NOISE_SEED)
+  const clickSamples = Math.min(out.length, Math.floor(CLICK_SEC * sampleRate))
+  const omega = 2 * Math.PI * CLICK_CENTER_HZ / sampleRate
+  const alpha = Math.sin(omega) / (2 * CLICK_Q)
+  const a0 = 1 + alpha
+  const b0 = alpha / a0
+  const b2 = -alpha / a0
+  const a1 = -2 * Math.cos(omega) / a0
+  const a2 = (1 - alpha) / a0
+  let x1 = 0
+  let x2 = 0
+  let y1 = 0
+  let y2 = 0
+  for (let i = 0; i < clickSamples; i++) {
+    const x = random()
+    const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
+    x2 = x1
+    x1 = x
+    y2 = y1
+    y1 = y
+    out[i] += CLICK_GAIN * y * (1 - i / clickSamples)
+  }
+}
+
+function normalize(samples: Float32Array): void {
+  let peak = 0
+  for (let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]))
+  if (peak === 0) return
+  for (let i = 0; i < samples.length; i++) samples[i] /= peak
+}
+
+function applyAttack(samples: Float32Array, sampleRate: number): void {
+  const attackSamples = Math.min(samples.length, Math.floor(ATTACK_SEC * sampleRate))
+  for (let i = 0; i < attackSamples; i++) samples[i] *= i / attackSamples
 }
 
 export function renderKotoWaveform(frequency: number, sampleRate: number): Float32Array<ArrayBuffer> {
-  const t60 = decayTimeSec(frequency)
-  const totalSamples = Math.floor(Math.min(t60 + TAIL_SEC, MAX_DURATION_SEC) * sampleRate)
-
-  // 1 周あたりのゲイン g は g^(t60 * frequency) = 10^-3 を満たす
-  const targetLoopGain = Math.pow(10, -3 / (t60 * frequency))
-
-  // ローパス y[n] = (1 - S) x[n] + S x[n-1] の基本波での振幅は sqrt(1 - 2S(1 - S)(1 - cos ω))。
-  // S = 0.5 (2 点平均) のままだと高音では 1 周の損失が g を下回り、T60 に届かない。
-  // そのとき S を下げて損失を g に合わせる。S は低域での遅延サンプル数にもなる。
-  // https://ccrma.stanford.edu/~jos/pasp/Extended_Karplus_Strong_Algorithm.html
-  const omega = 2 * Math.PI * frequency / sampleRate
-  const requiredLoss = (1 - targetLoopGain ** 2) / (1 - Math.cos(omega))
-  const lowpassDelay = requiredLoss >= 0.5
-    ? AVERAGING_WEIGHT
-    : (1 - Math.sqrt(1 - 2 * requiredLoss)) / 2
-  const fundamentalLoss = Math.sqrt(1 - 2 * lowpassDelay * (1 - lowpassDelay) * (1 - Math.cos(omega)))
-  const loopGain = Math.min(MAX_LOOP_GAIN, targetLoopGain / fundamentalLoss)
-
-  const period = sampleRate / frequency
-  const lineLength = Math.floor(period - lowpassDelay - MIN_FRACTIONAL_DELAY)
-  const fractionalDelay = period - lowpassDelay - lineLength
-  // 1 次 allpass H(z) = (C + z^-1) / (1 + C z^-1) の低域遅延が d サンプルになる係数
-  // https://ccrma.stanford.edu/~jos/pasp/First_Order_Allpass_Interpolation.html
-  const allpassCoef = (1 - fractionalDelay) / (1 + fractionalDelay)
-
-  const random = createRandom(NOISE_SEED)
-  const line = createExcitation(lineLength, random)
-
+  if (!(Number.isFinite(frequency) && frequency > 0 && Number.isFinite(sampleRate) && sampleRate > 0)) {
+    throw new RangeError(`invalid frequency or sampleRate: ${frequency}, ${sampleRate}`)
+  }
+  const totalSamples = Math.floor(Math.min(decayTimeSec(frequency) + TAIL_SEC, MAX_DURATION_SEC) * sampleRate)
   const out = new Float32Array(totalSamples)
-  let index = 0
-  let lowpassPrev = 0
-  let allpassIn = 0
-  let allpassOut = 0
-  for (let n = 0; n < totalSamples; n++) {
-    const delayed = line[index]
-    out[n] = delayed
-    const lowpassed = loopGain * ((1 - lowpassDelay) * delayed + lowpassDelay * lowpassPrev)
-    lowpassPrev = delayed
-    const filtered = allpassCoef * lowpassed + allpassIn - allpassCoef * allpassOut
-    allpassIn = lowpassed
-    allpassOut = filtered
-    line[index] = filtered
-    index = (index + 1) % lineLength
-  }
 
-  let peak = 0
-  for (let i = 0; i < totalSamples; i++) peak = Math.max(peak, Math.abs(out[i]))
-  const scale = peak > 0 ? 1 / peak : 1
-  for (let i = 0; i < totalSamples; i++) out[i] *= scale
-
-  // 爪が弦に当たる瞬間の高域ノイズ
-  const clickSamples = Math.min(totalSamples, Math.floor(CLICK_SEC * sampleRate))
-  let prevNoise = 0
-  for (let i = 0; i < clickSamples; i++) {
-    const noise = random()
-    const highpassed = noise - prevNoise
-    prevNoise = noise
-    out[i] += CLICK_GAIN * highpassed * (1 - i / clickSamples)
-  }
-
-  let finalPeak = 0
-  for (let i = 0; i < totalSamples; i++) finalPeak = Math.max(finalPeak, Math.abs(out[i]))
-  if (finalPeak > 0) {
-    for (let i = 0; i < totalSamples; i++) out[i] /= finalPeak
-  }
+  addModes(out, frequency, sampleRate, 1, 1)
+  addModes(
+    out,
+    frequency * Math.pow(2, BEAT_DETUNE_CENTS / 1200),
+    sampleRate,
+    BEAT_AMPLITUDE_RATIO,
+    BEAT_T60_RATIO,
+  )
+  applyAttack(out, sampleRate)
+  normalize(out)
+  addClick(out, sampleRate)
+  normalize(out)
   return out
 }
