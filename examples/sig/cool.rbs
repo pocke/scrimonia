@@ -1,0 +1,3 @@
+class Object
+  private def add_mora_chords: (Scrimonia::layer_mapping layer) -> Scrimonia::layer_mapping
+end
