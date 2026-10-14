@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PianoSynth } from './pianoSynth'
+import type { Synth } from './synth'
 
 export type MidiConnectionStatus =
   | { kind: 'unsupported' }
@@ -15,10 +15,10 @@ export interface MidiInputState {
 }
 
 /**
- * Web MIDI API から MIDI 入力を購読し、渡された PianoSynth で音を鳴らす React フック。
+ * Web MIDI API から MIDI 入力を購読し、渡された Synth で音を鳴らす React フック。
  * 接続状態と「現在押下中のノート」を返す。アプリ全体で一度だけ呼ぶことを想定する。
  */
-export function useMidiInput(synth: PianoSynth): MidiInputState {
+export function useMidiInput(synth: Synth): MidiInputState {
   const [status, setStatus] = useState<MidiConnectionStatus>(() =>
     typeof navigator.requestMIDIAccess === 'function'
       ? { kind: 'requesting' }

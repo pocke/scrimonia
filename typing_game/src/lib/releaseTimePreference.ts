@@ -1,4 +1,4 @@
-import { DEFAULT_RELEASE_SEC } from './pianoSynth'
+import { DEFAULT_RELEASE_SEC } from './synth'
 
 export { DEFAULT_RELEASE_SEC }
 

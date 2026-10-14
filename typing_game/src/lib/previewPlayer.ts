@@ -1,4 +1,4 @@
-import type { PianoSynth } from './pianoSynth'
+import type { Synth } from './synth'
 import type { PreviewStroke } from './previewPlanner'
 
 export const STROKE_INTERVAL_MS = 300
@@ -13,7 +13,7 @@ interface PlayOptions {
 }
 
 export function playPreview(
-  synth: PianoSynth,
+  synth: Synth,
   strokes: PreviewStroke[],
   onEnd: () => void,
   { intervalMs = STROKE_INTERVAL_MS, startIndex = 0, onStroke }: PlayOptions = {},

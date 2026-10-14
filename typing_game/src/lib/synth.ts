@@ -1,3 +1,11 @@
+import { KotoVoice } from './kotoVoice'
+
+export type Instrument = 'piano' | 'koto'
+
+interface Voice {
+  release(releaseSec: number): void
+}
+
 function midiNoteToFrequency(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12)
 }
@@ -20,7 +28,7 @@ const NATURAL_DECAY_SEC = 6
 const MIN_GAIN = 0.0001
 export const DEFAULT_RELEASE_SEC = 0.6
 
-class Voice {
+class PianoVoice {
   private ctx: AudioContext
   private oscillators: OscillatorNode[] = []
   private gain: GainNode
@@ -79,11 +87,16 @@ class Voice {
   }
 }
 
-export class PianoSynth {
+export class Synth {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private voices = new Map<number, Voice>()
   private releaseSec = DEFAULT_RELEASE_SEC
+  private instrument: Instrument = 'piano'
+
+  setInstrument(instrument: Instrument) {
+    this.instrument = instrument
+  }
 
   setReleaseSec(sec: number) {
     this.releaseSec = sec
@@ -105,11 +118,14 @@ export class PianoSynth {
   noteOn(note: number, velocity: number) {
     const { ctx, master } = this.ensureContext()
     this.voices.get(note)?.release(this.releaseSec)
-    const voice = new Voice(ctx, master, note, velocity, () => {
+    const onEnded = () => {
       if (this.voices.get(note) === voice) {
         this.voices.delete(note)
       }
-    })
+    }
+    const voice: Voice = this.instrument === 'koto'
+      ? new KotoVoice(ctx, master, note, velocity, onEnded)
+      : new PianoVoice(ctx, master, note, velocity, onEnded)
     this.voices.set(note, voice)
   }
 
