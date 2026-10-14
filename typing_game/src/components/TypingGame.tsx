@@ -80,20 +80,21 @@ function createGameState(mode: GameMode, retryText?: { targetText: string; displ
   }
 }
 
-function createNewGameState(mode: GameMode): GameState {
-  if (mode === 'ja') {
-    const sample = pickJaText()
-    return {
-      status: 'idle',
-      mode,
-      targetText: sample.kana,
-      displayText: sample.display,
-      currentIndex: 0,
-      errors: 0,
-      startTime: null,
-      romajiState: createInitialState(sample.kana),
-    }
+function createJaGameState(sample: JapaneseSampleText): GameState {
+  return {
+    status: 'idle',
+    mode: 'ja',
+    targetText: sample.kana,
+    displayText: sample.display,
+    currentIndex: 0,
+    errors: 0,
+    startTime: null,
+    romajiState: createInitialState(sample.kana),
   }
+}
+
+function createNewGameState(mode: GameMode): GameState {
+  if (mode === 'ja') return createJaGameState(pickJaText())
   return {
     status: 'idle',
     mode,
@@ -278,6 +279,18 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     setElapsedMs(0)
   }
 
+  const handleSelectPoem = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sample = sampleTextsJa[Number(e.target.value)]
+    e.currentTarget.blur()
+    if (!sample) return
+    setGame(createJaGameState(sample))
+    setElapsedMs(0)
+  }
+
+  const selectedPoemIndex = game.mode === 'ja'
+    ? sampleTextsJa.findIndex(t => t.kana === game.targetText)
+    : -1
+
   const elapsedSec = elapsedMs / 1000
   // For romaji mode, count typed romaji characters for WPM
   const typedChars = game.mode === 'ja' && game.romajiState
@@ -290,6 +303,17 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   return (
     <div ref={containerRef} tabIndex={-1} className="outline-none space-y-6">
+      {game.mode === 'ja' && (
+        <select
+          value={selectedPoemIndex}
+          onChange={handleSelectPoem}
+          className="w-full bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
+        >
+          {sampleTextsJa.map((t, i) => (
+            <option key={i} value={i}>{`${i + 1}. ${t.display}`}</option>
+          ))}
+        </select>
+      )}
       {/* お題テキスト */}
       <div
         key={shakeKey}
