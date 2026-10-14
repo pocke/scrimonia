@@ -94,4 +94,39 @@ describe('planPreview', () => {
     const result = planPreview(keymap, textToCharChunks('a b'), DEFAULT_PREFERENCES)
     expect(strokesOf(result).map(s => s.text)).toEqual(['a', ' ', 'b'])
   })
+
+  it('prefers two velocity-free strokes over a one-stroke macro that needs a velocity choice', () => {
+    const keymap: LayerKeymap = [
+      key('n', [60]),
+      key('a', [48]),
+      macro('na', [62, 48], [1, 70]),
+    ]
+    const strokes = strokesOf(plan(keymap, 'な'))
+    expect(strokes.map(s => s.text)).toEqual(['n', 'a'])
+  })
+
+  it('plays a velocity-free entry outside the ranges of entries sharing its notes', () => {
+    const keymap: LayerKeymap = [
+      key('k', [60]),
+      key('z', [60], [71, 127]),
+      key('i', [50]),
+    ]
+    const strokes = strokesOf(plan(keymap, 'き'))
+    expect(strokes[0].text).toBe('k')
+    expect(strokes[0].velocity).toBeLessThanOrEqual(70)
+  })
+
+  it('does not use a velocity-free entry that no velocity can trigger', () => {
+    const keymap: LayerKeymap = [
+      key('k', [60]),
+      key('z', [60], [1, 127]),
+      key('i', [50]),
+    ]
+    expect(plan(keymap, 'き')).toEqual({ ok: false, chunkIndex: 0 })
+  })
+
+  it('clamps the playback velocity to the MIDI range', () => {
+    const keymap: LayerKeymap = [key('a', [60], [500, 1000])]
+    expect(strokesOf(plan(keymap, 'あ'))[0].velocity).toBe(127)
+  })
 })

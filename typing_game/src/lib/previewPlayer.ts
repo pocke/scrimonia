@@ -4,7 +4,6 @@ import type { PreviewStroke } from './previewPlanner'
 const STROKE_INTERVAL_MS = 300
 const NOTE_LENGTH_RATIO = 0.8
 
-/** strokes を順に鳴らす。戻り値の関数を呼ぶと止める。 */
 export function playPreview(synth: PianoSynth, strokes: PreviewStroke[], onEnd: () => void): () => void {
   const timers = new Set<ReturnType<typeof setTimeout>>()
   const sounding = new Set<number>()

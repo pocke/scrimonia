@@ -6,13 +6,10 @@ import { type RomajiPreferences, getPreferredCandidate } from './romajiPreferenc
 
 export interface PreviewStroke {
   noteNumbers: number[]
-  /** 再生に使うベロシティ。範囲指定なら中央値、指定なしなら DEFAULT_VELOCITY。 */
+  /** 再生に使うベロシティ。範囲指定なら中央値、指定なしなら範囲の外で DEFAULT_VELOCITY に最も近い値。 */
   velocity: number
-  /** この打鍵で入力される文字列 */
   text: string
-  /** 弱打/強打の打ち分けが必要な打鍵か */
   requiresVelocity: boolean
-  /** 句の先頭を打ち始める打鍵か。再生時に間を空ける。 */
   pauseBefore: boolean
 }
 
@@ -29,6 +26,7 @@ export function textToCharChunks(text: string): RomajiChunk[] {
 interface Edge {
   text: string
   hint: NoteHint
+  velocity: number
   requiresVelocity: boolean
 }
 
@@ -53,33 +51,56 @@ function noteSetKey(noteNumbers: number[]): string {
   return [...noteNumbers].sort((a, b) => a - b).join(',')
 }
 
+function clampVelocity(v: number): number {
+  return Number.isFinite(v) ? Math.min(127, Math.max(1, Math.round(v))) : DEFAULT_VELOCITY
+}
+
+/** ranges のどれにも入らないベロシティのうち DEFAULT_VELOCITY に最も近いもの。無ければ null。 */
+function velocityOutside(ranges: [number, number][]): number | null {
+  let best: number | null = null
+  for (let v = 1; v <= 127; v++) {
+    if (ranges.some(([min, max]) => v >= min && v <= max)) continue
+    if (best === null || Math.abs(v - DEFAULT_VELOCITY) < Math.abs(best - DEFAULT_VELOCITY)) best = v
+  }
+  return best
+}
+
 function buildEdges(keymap: LayerKeymap): Edge[] {
   // 同じノート集合にベロシティ付きエントリがあると、ベロシティ指定なしのエントリより
-  // そちらが優先される (doc/keymap.md)。指定なしのエントリでも打ち分けが要る。
-  const velocityNoteSets = new Set<string>()
+  // そちらが優先される (doc/keymap.md)。指定なしのエントリは、その範囲の外のベロシティで
+  // 弾いたときだけ発火し、打ち分けも必要になる。範囲が全域を覆うと一度も発火しない。
+  const rangesByNotes = new Map<string, [number, number][]>()
   for (const entry of keymap) {
-    if (entry.velocity) velocityNoteSets.add(noteSetKey(entry.noteNumbers))
+    if (!entry.velocity) continue
+    const key = noteSetKey(entry.noteNumbers)
+    rangesByNotes.set(key, [...(rangesByNotes.get(key) ?? []), entry.velocity])
   }
-  const needsVelocity = (hint: NoteHint) =>
-    hint.velocity !== null || velocityNoteSets.has(noteSetKey(hint.noteNumbers))
+
+  const toEdge = (text: string, hint: NoteHint): Edge | null => {
+    if (hint.velocity) {
+      const mid = (hint.velocity[0] + hint.velocity[1]) / 2
+      return { text, hint, velocity: clampVelocity(mid), requiresVelocity: true }
+    }
+    const ranges = rangesByNotes.get(noteSetKey(hint.noteNumbers))
+    if (!ranges) return { text, hint, velocity: DEFAULT_VELOCITY, requiresVelocity: false }
+    const velocity = velocityOutside(ranges)
+    return velocity === null ? null : { text, hint, velocity, requiresVelocity: true }
+  }
 
   const reverse = buildReverseKeymap(keymap)
   const edges: Edge[] = []
+  const add = (edge: Edge | null) => {
+    if (edge) edges.push(edge)
+  }
   for (const [char, hints] of reverse.byChar) {
     if (char.length !== 1) continue
-    for (const hint of hints) edges.push({ text: char, hint, requiresVelocity: needsVelocity(hint) })
+    for (const hint of hints) add(toEdge(char, hint))
   }
-  for (const macro of reverse.macros) {
-    edges.push({ text: macro.text, hint: macro, requiresVelocity: needsVelocity(macro) })
-  }
+  for (const macro of reverse.macros) add(toEdge(macro.text, macro))
   return edges
 }
 
-function playbackVelocity(hint: NoteHint): number {
-  return hint.velocity ? Math.round((hint.velocity[0] + hint.velocity[1]) / 2) : DEFAULT_VELOCITY
-}
-
-/** text を state から打ち、最後の文字で入力が終わらずに全て受理されたときだけ結果を返す。 */
+/** text を state から打つ。途中の文字でお題を打ち終えたり、受理されない文字があれば null。 */
 function applyText(
   state: RomajiInputState,
   text: string,
@@ -155,7 +176,7 @@ export function planPreview(
         prev: best,
         stroke: {
           noteNumbers: edge.hint.noteNumbers,
-          velocity: playbackVelocity(edge.hint),
+          velocity: edge.velocity,
           text: edge.text,
           requiresVelocity: edge.requiresVelocity,
           pauseBefore: startsPhrase,

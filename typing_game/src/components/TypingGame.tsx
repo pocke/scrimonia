@@ -48,6 +48,10 @@ interface GameState {
   romajiState: RomajiInputState | null
 }
 
+function displayChar(kana: string | undefined): string {
+  return kana === ' ' ? '␣' : (kana ?? '')
+}
+
 function pickJaText(): JapaneseSampleText {
   return sampleTextsJa[Math.floor(Math.random() * sampleTextsJa.length)]
 }
@@ -135,8 +139,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     return { chunks, plan: planPreview(keymap, chunks, romajiPreferences) }
   }, [keymap, game.mode, game.targetText, romajiPreferences])
 
-  // お題・キーマップ・流儀が変わって plan が作り直されたとき、アンマウント時に止める。
-  // playingPlan は plan の同一性で比べるので、ここでは setState しない。
+  // playingPlan は plan の同一性で比べるので、plan が変わったときは setState せずタイマーだけ止める。
   useEffect(() => () => {
     stopPreviewRef.current?.()
     stopPreviewRef.current = null
@@ -348,28 +351,28 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
   return (
     <div ref={containerRef} tabIndex={-1} className="outline-none space-y-6">
       <div className="flex items-center gap-3">
-      {game.mode === 'ja' && (
-        <select
-          value={selectedPoemIndex}
-          onChange={handleSelectPoem}
-          className="min-w-0 flex-1 bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
+        {game.mode === 'ja' && (
+          <select
+            value={selectedPoemIndex}
+            onChange={handleSelectPoem}
+            className="min-w-0 flex-1 bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
+          >
+            {sampleTextsJa.map((t, i) => (
+              <option key={i} value={i}>{`${i + 1}. ${t.display}`}</option>
+            ))}
+          </select>
+        )}
+        <button
+          onClick={handleTogglePreview}
+          disabled={!previewing && !preview.plan.ok}
+          className="shrink-0 px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-white text-sm disabled:opacity-40 disabled:hover:bg-gray-700"
         >
-          {sampleTextsJa.map((t, i) => (
-            <option key={i} value={i}>{`${i + 1}. ${t.display}`}</option>
-          ))}
-        </select>
-      )}
-      <button
-        onClick={handleTogglePreview}
-        disabled={!previewing && !preview.plan.ok}
-        className="shrink-0 px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-white text-sm disabled:opacity-40 disabled:hover:bg-gray-700"
-      >
-        {previewing ? '■ 停止' : '▶ 音をプレビュー'}
-      </button>
+          {previewing ? '■ 停止' : '▶ 音をプレビュー'}
+        </button>
       </div>
       {!preview.plan.ok && (
         <p className="text-sm text-red-400">
-          このキーマップでは「{preview.chunks[preview.plan.chunkIndex]?.kana}」を入力できない
+          このレイヤーでは「{displayChar(preview.chunks[preview.plan.chunkIndex]?.kana)}」を入力できない
         </p>
       )}
       {/* お題テキスト */}

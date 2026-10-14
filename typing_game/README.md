@@ -33,6 +33,14 @@ npm run build
 
 `dist/` ディレクトリに静的ファイルが生成される。
 
+## テスト
+
+```sh
+npm test
+```
+
+vitest でユニットテストを実行する。
+
 ## 技術スタック
 
 - [Vite](https://vite.dev/) + [React](https://react.dev/) + TypeScript
