@@ -2,7 +2,7 @@ require 'scrimonia'
 include Scrimonia::Notes # steep:ignore NoMethod
 include Scrimonia::Keycodes # steep:ignore NoMethod
 
-# 彩りダイアトニック（採用） / 37鍵 — 文字 + モーラ和音Macro + 修飾 + 空白/改行 + :num(トグル)
+# 彩りダイアトニック（採用） / 37鍵 — 文字 + モーラ和音Macro + 修飾 + 空白/編集 + :num(トグル)
 mp = Scrimonia.new
 soft = 1..70
 hard = 71..127
@@ -40,7 +40,6 @@ mp.add_layer :default, {
   F5   => KC_D,
   G5   => KC_Z,
   A5   => KC_B,
-  B5   => KC_P,
 
   # 濁音・半濁音: 清音の子音から半音ずらした黒鍵
   Cs4  => KC_G,   # g (k の半音下)
@@ -110,11 +109,6 @@ mp.add_layer :default, {
   [A5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("bu"),
   [A5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("be"),
   [A5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("bo"),
-  [B5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("pa"),
-  [B5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("pi"),
-  [B5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("pu"),
-  [B5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("pe"),
-  [B5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("po"),
 
   # 黒鍵の濁音・半濁音 + 母音 (velocity 判定なし)
   [Cs4, C3] => Scrimonia::Action::Macro.new("ga"),
@@ -149,10 +143,12 @@ mp.add_layer :default, {
   F3   => KC_LSFT,   # ⇧
   Fs3  => KC_LGUI,   # Gui
 
-  # レイヤー(トグル) / 空白 / 改行
+  # レイヤー(トグル) / 空白 / 編集
   Gs3  => layer_num,   # 押すたび :num をトグル
   As3  => KC_SPC,   # ␣
   B3   => KC_ENTER,   # ⏎
+  B5   => KC_TAB,   # ⇥
+  C6   => KC_BSPC,   # ⌫
 
   # カーソル
   Cs5  => KC_DOWN,   # ↓
