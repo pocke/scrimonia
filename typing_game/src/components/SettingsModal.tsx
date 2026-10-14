@@ -1,5 +1,6 @@
 import type { RomajiPreferences } from '../lib/romajiPreferences'
 import type { KeymapData } from '../types'
+import { MAX_RELEASE_SEC, MIN_RELEASE_SEC } from '../lib/releaseTimePreference'
 import { KeymapUploader } from './KeymapUploader'
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   onPreferencesChange: (prefs: RomajiPreferences) => void
   deviceSoundEnabled: boolean
   onDeviceSoundChange: (enabled: boolean) => void
+  releaseSec: number
+  onReleaseSecChange: (sec: number) => void
   onKeymapParsed: (data: KeymapData, rawContent: string) => void
   onClose: () => void
 }
@@ -25,7 +28,7 @@ const SETTINGS: SettingRow[] = [
   { label: 'じ行', key: 'ji',  options: [{ value: 'zi', label: 'zi' }, { value: 'ji', label: 'ji' }] },
 ]
 
-export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEnabled, onDeviceSoundChange, onKeymapParsed, onClose }: Props) {
+export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEnabled, onDeviceSoundChange, releaseSec, onReleaseSecChange, onKeymapParsed, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
@@ -70,6 +73,19 @@ export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEna
               className="accent-blue-500"
             />
             <span className="text-gray-200">デバイスで押した鍵盤の音を鳴らす</span>
+          </label>
+          <label className="flex items-center gap-3 text-sm">
+            <span className="text-gray-200 shrink-0">音の余韻</span>
+            <input
+              type="range"
+              min={MIN_RELEASE_SEC}
+              max={MAX_RELEASE_SEC}
+              step={0.05}
+              value={releaseSec}
+              onChange={e => onReleaseSecChange(Number(e.target.value))}
+              className="accent-blue-500 flex-1"
+            />
+            <span className="text-gray-300 w-16 text-right tabular-nums">{releaseSec.toFixed(2)} 秒</span>
           </label>
         </div>
 
