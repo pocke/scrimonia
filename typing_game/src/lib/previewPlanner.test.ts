@@ -129,4 +129,22 @@ describe('planPreview', () => {
     const keymap: LayerKeymap = [key('a', [60], [500, 1000])]
     expect(strokesOf(plan(keymap, 'あ'))[0].velocity).toBe(127)
   })
+
+  it('reports the chunk range each stroke types', () => {
+    const keymap: LayerKeymap = [macro('ga', [60, 48]), macro('na', [61, 49])]
+    const strokes = strokesOf(plan(keymap, 'がな'))
+    expect(strokes.map(s => [s.chunkStart, s.chunkEnd])).toEqual([[0, 0], [1, 1]])
+  })
+
+  it('reports the same chunk for both strokes that type one chunk', () => {
+    const keymap: LayerKeymap = [key('k', [60]), key('a', [48])]
+    const strokes = strokesOf(plan(keymap, 'か'))
+    expect(strokes.map(s => [s.chunkStart, s.chunkEnd])).toEqual([[0, 0], [0, 0]])
+  })
+
+  it('reports a range spanning chunks for a macro that types several chunks', () => {
+    const keymap: LayerKeymap = [macro('kana', [60, 48])]
+    const strokes = strokesOf(plan(keymap, 'かな'))
+    expect(strokes.map(s => [s.chunkStart, s.chunkEnd])).toEqual([[0, 1]])
+  })
 })

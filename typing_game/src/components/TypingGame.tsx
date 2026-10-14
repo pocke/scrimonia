@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { ChordHighlight, LayerKeymap } from '../types'
 import { buildReverseKeymap, type MacroHint } from '../lib/reverseKeymap'
-import { entryLabel } from '../lib/hidKeycodes'
+import { entryLabel, noteNumberToName } from '../lib/hidKeycodes'
 import { sampleTexts } from '../lib/sampleTexts'
 import { sampleTextsJa, type JapaneseSampleText } from '../lib/sampleTextsJa'
 import {
@@ -14,7 +14,7 @@ import {
 } from '../lib/romajiMatcher'
 import type { RomajiPreferences } from '../lib/romajiPreferences'
 import type { PianoSynth } from '../lib/pianoSynth'
-import { planPreview, textToCharChunks, type PreviewPlan } from '../lib/previewPlanner'
+import { planPreview, textToCharChunks, type PreviewPlan, type PreviewStroke } from '../lib/previewPlanner'
 import { playPreview, STROKE_INTERVAL_MS } from '../lib/previewPlayer'
 import { PREVIEW_SPEEDS, loadPreviewSpeed, savePreviewSpeed } from '../lib/previewSpeedPreference'
 
@@ -29,6 +29,8 @@ interface Props {
   onRightInput?: () => void
   /** 期待文字と一致しないキー入力があったときに呼ばれる。鍵盤を赤くするための通知。 */
   onWrongInput?: () => void
+  /** プレビュー再生中に鳴らしている打鍵のノート。ピアノで押下中の見た目にするための通知。 */
+  onPreviewNotesChange?: (noteNumbers: number[] | undefined) => void
   mode: GameMode
   romajiPreferences: RomajiPreferences
   synth: PianoSynth
@@ -36,6 +38,13 @@ interface Props {
 
 function macroHintToChordHighlight(macro: MacroHint): ChordHighlight {
   return { noteNumbers: macro.noteNumbers, label: entryLabel({ ...macro, type: 'macro' }) }
+}
+
+const PREVIEW_HIGHLIGHT_CLASS = 'text-yellow-300 bg-yellow-500/20 rounded'
+
+function previewStrokeToChordHighlight(stroke: PreviewStroke): ChordHighlight {
+  const label = entryLabel({ type: 'macro', text: stroke.text, noteNumbers: stroke.noteNumbers, noteNames: [], velocity: null })
+  return { noteNumbers: stroke.noteNumbers, label }
 }
 
 interface GameState {
@@ -116,7 +125,7 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences, synth }: Props) {
+export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, onPreviewNotesChange, mode, romajiPreferences, synth }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
@@ -126,7 +135,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   const [playingPlan, setPlayingPlan] = useState<PreviewPlan | null>(null)
   const stopPreviewRef = useRef<(() => void) | null>(null)
-  const playingStrokeRef = useRef(0)
+  const [playingStroke, setPlayingStroke] = useState<number | null>(null)
   const [previewSpeed, setPreviewSpeed] = useState(loadPreviewSpeed)
 
   const stopPreview = useCallback(() => {
@@ -149,12 +158,25 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
   }, [preview])
 
   const previewing = playingPlan === preview.plan
+  const previewStroke: PreviewStroke | undefined =
+    previewing && preview.plan.ok && playingStroke !== null ? preview.plan.strokes[playingStroke] : undefined
+
+  useEffect(() => {
+    onPreviewNotesChange?.(previewStroke?.noteNumbers)
+    return () => onPreviewNotesChange?.(undefined)
+  }, [previewStroke, onPreviewNotesChange])
 
   // Highlight notes for the next expected key
   useEffect(() => {
     if (game.status === 'finished') {
       onHighlightChange(undefined)
       onChordHighlightChange?.(undefined)
+      return
+    }
+
+    if (previewStroke) {
+      onHighlightChange(undefined)
+      onChordHighlightChange?.(previewStroke.noteNumbers.length >= 2 ? [previewStrokeToChordHighlight(previewStroke)] : undefined)
       return
     }
 
@@ -180,7 +202,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
       onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
       onChordHighlightChange?.(matchedMacros.length > 0 ? matchedMacros.map(macroHintToChordHighlight) : undefined)
     }
-  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, onChordHighlightChange, romajiPreferences])
+  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, onChordHighlightChange, romajiPreferences, previewStroke])
 
   // Elapsed time timer
   useEffect(() => {
@@ -324,10 +346,9 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     }, {
       intervalMs: STROKE_INTERVAL_MS / speed,
       startIndex,
-      onStroke: index => {
-        playingStrokeRef.current = index
-      },
+      onStroke: setPlayingStroke,
     })
+    setPlayingStroke(startIndex)
   }
 
   const handleTogglePreview = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -337,7 +358,6 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
       return
     }
     if (!preview.plan.ok) return
-    playingStrokeRef.current = 0
     startPlayback(preview.plan, 0, previewSpeed)
   }
 
@@ -346,7 +366,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     e.currentTarget.blur()
     setPreviewSpeed(speed)
     savePreviewSpeed(speed)
-    if (previewing && preview.plan.ok) startPlayback(preview.plan, playingStrokeRef.current, speed)
+    if (previewing && preview.plan.ok) startPlayback(preview.plan, playingStroke ?? 0, speed)
   }
 
   const handleSelectPoem = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -403,6 +423,11 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
           ))}
         </select>
       </div>
+      {previewStroke && (
+        <p className="text-sm text-yellow-300">
+          {`♪ ${previewStroke.text} (${previewStroke.noteNumbers.map(noteNumberToName).join('+')})`}
+        </p>
+      )}
       {!preview.plan.ok && (
         <p className="text-sm text-red-400">
           このレイヤーでは「{displayChar(preview.chunks[preview.plan.chunkIndex]?.kana)}」を入力できない
@@ -418,7 +443,9 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
           <div className="text-2xl leading-relaxed tracking-wide">
             {game.targetText.split('').map((char, i) => {
               let className = 'text-gray-500'
-              if (i < game.currentIndex) {
+              if (previewStroke && i >= previewStroke.chunkStart && i <= previewStroke.chunkEnd) {
+                className = PREVIEW_HIGHLIGHT_CLASS
+              } else if (i < game.currentIndex) {
                 className = 'text-green-400'
               } else if (i === game.currentIndex) {
                 className = shakeKey > 0
@@ -445,7 +472,9 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
             <div className="text-2xl leading-relaxed tracking-wide">
               {game.romajiState.chunks.map((chunk, i) => {
                 let className = 'text-gray-500'
-                if (i < game.romajiState!.currentChunkIndex) {
+                if (previewStroke && i >= previewStroke.chunkStart && i <= previewStroke.chunkEnd) {
+                  className = PREVIEW_HIGHLIGHT_CLASS
+                } else if (i < game.romajiState!.currentChunkIndex) {
                   className = 'text-green-400'
                 } else if (i === game.romajiState!.currentChunkIndex) {
                   className = shakeKey > 0

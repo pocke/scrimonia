@@ -11,6 +11,9 @@ export interface PreviewStroke {
   text: string
   requiresVelocity: boolean
   pauseBefore: boolean
+  /** この打鍵が入力するチャンクの範囲 (両端を含む)。 */
+  chunkStart: number
+  chunkEnd: number
 }
 
 export type PreviewPlan =
@@ -180,6 +183,10 @@ export function planPreview(
           text: edge.text,
           requiresVelocity: edge.requiresVelocity,
           pauseBefore: startsPhrase,
+          chunkStart: state.currentChunkIndex,
+          chunkEnd: applied.state.currentInput === ''
+            ? applied.state.currentChunkIndex - 1
+            : applied.state.currentChunkIndex,
         },
         done: false,
       })

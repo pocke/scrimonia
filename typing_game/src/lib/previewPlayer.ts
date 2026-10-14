@@ -8,8 +8,8 @@ interface PlayOptions {
   intervalMs?: number
   /** strokes のこの位置から再生する。 */
   startIndex?: number
-  /** 打鍵の音を鳴らす時点で、その打鍵の index を渡す。 */
-  onStroke?: (index: number) => void
+  /** 打鍵の音を鳴らす時点でその打鍵の index を、再生が終わるか止めたときに null を渡す。 */
+  onStroke?: (index: number | null) => void
 }
 
 export function playPreview(
@@ -51,6 +51,7 @@ export function playPreview(
   }
   schedule(() => {
     stopped = true
+    onStroke?.(null)
     onEnd()
   }, at)
 
@@ -61,5 +62,6 @@ export function playPreview(
     timers.clear()
     for (const note of sounding) synth.noteOff(note)
     sounding.clear()
+    onStroke?.(null)
   }
 }
