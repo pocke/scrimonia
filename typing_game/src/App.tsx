@@ -43,6 +43,7 @@ function App() {
   const [rawKeymap, setRawKeymap] = useState<string | null>(() => localStorage.getItem(RAW_KEYMAP_STORAGE_KEY))
   const [typingHighlightNotes, setTypingHighlightNotes] = useState<number[] | undefined>()
   const [typingHighlightChords, setTypingHighlightChords] = useState<ChordHighlight[] | undefined>()
+  const [previewNotes, setPreviewNotes] = useState<number[] | undefined>()
   const [appMode, setAppMode] = useState<GameMode>('en')
   const [romajiPreferences, setRomajiPreferences] = useState<RomajiPreferences>(loadPreferences)
   const [showSettings, setShowSettings] = useState(false)
@@ -205,6 +206,9 @@ function App() {
     : serialRightNotes.length === 0
     ? midiActiveNotes
     : Array.from(new Set([...midiActiveNotes, ...serialRightNotes]))
+  const displayedActiveNotes = previewNotes
+    ? Array.from(new Set([...allActiveNotes, ...previewNotes]))
+    : allActiveNotes
 
   useEffect(() => {
     keymapRef.current = keymap
@@ -286,9 +290,9 @@ function App() {
                 />
               </div>
             </div>
-            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} highlightChords={typingHighlightChords} activeNotes={allActiveNotes} wrongNotes={serialWrongNotes} />
+            <PianoKeyboard keymap={activeLayer} highlightNotes={typingHighlightNotes} highlightChords={typingHighlightChords} activeNotes={displayedActiveNotes} wrongNotes={serialWrongNotes} />
             <MidiStatusView status={midiStatus} />
-            <TypingGame key={appMode} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onChordHighlightChange={setTypingHighlightChords} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} mode={appMode} romajiPreferences={romajiPreferences} />
+            <TypingGame key={appMode} keymap={activeLayer} onHighlightChange={setTypingHighlightNotes} onChordHighlightChange={setTypingHighlightChords} onRightInput={handleRightTypingInput} onWrongInput={handleWrongTypingInput} onPreviewNotesChange={setPreviewNotes} mode={appMode} romajiPreferences={romajiPreferences} synth={synth} />
             <DeviceConsole lines={deviceLines} />
           </>
         )}

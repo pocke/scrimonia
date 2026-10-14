@@ -36,7 +36,7 @@ const HID_MODIFIER_TO_NAME: Record<number, string> = {
 // Scrimonia::Note::NOTE_NAMES と同じ並び。
 const NOTE_NAMES = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B']
 
-function noteNumberToName(noteNumber: number): string {
+export function noteNumberToName(noteNumber: number): string {
   const octave = Math.floor(noteNumber / 12) - 1
   return `${NOTE_NAMES[noteNumber % 12]}${octave}`
 }

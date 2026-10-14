@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { ChordHighlight, LayerKeymap } from '../types'
 import { buildReverseKeymap, type MacroHint } from '../lib/reverseKeymap'
-import { entryLabel } from '../lib/hidKeycodes'
+import { entryLabel, noteNumberToName } from '../lib/hidKeycodes'
 import { sampleTexts } from '../lib/sampleTexts'
 import { sampleTextsJa, type JapaneseSampleText } from '../lib/sampleTextsJa'
 import {
@@ -13,6 +13,10 @@ import {
   canTypeSequence,
 } from '../lib/romajiMatcher'
 import type { RomajiPreferences } from '../lib/romajiPreferences'
+import type { PianoSynth } from '../lib/pianoSynth'
+import { planPreview, textToCharChunks, type PreviewPlan, type PreviewStroke } from '../lib/previewPlanner'
+import { playPreview, STROKE_INTERVAL_MS } from '../lib/previewPlayer'
+import { PREVIEW_SPEEDS, loadPreviewSpeed, savePreviewSpeed } from '../lib/previewSpeedPreference'
 
 export type GameMode = 'en' | 'ja'
 
@@ -25,12 +29,22 @@ interface Props {
   onRightInput?: () => void
   /** 期待文字と一致しないキー入力があったときに呼ばれる。鍵盤を赤くするための通知。 */
   onWrongInput?: () => void
+  /** プレビュー再生中に鳴らしている打鍵のノート。ピアノで押下中の見た目にするための通知。 */
+  onPreviewNotesChange?: (noteNumbers: number[] | undefined) => void
   mode: GameMode
   romajiPreferences: RomajiPreferences
+  synth: PianoSynth
 }
 
 function macroHintToChordHighlight(macro: MacroHint): ChordHighlight {
   return { noteNumbers: macro.noteNumbers, label: entryLabel({ ...macro, type: 'macro' }) }
+}
+
+const PREVIEW_HIGHLIGHT_CLASS = 'text-yellow-300 bg-yellow-500/20 rounded'
+
+function previewStrokeToChordHighlight(stroke: PreviewStroke): ChordHighlight {
+  const label = entryLabel({ type: 'macro', text: stroke.text, noteNumbers: stroke.noteNumbers, noteNames: [], velocity: null })
+  return { noteNumbers: stroke.noteNumbers, label }
 }
 
 interface GameState {
@@ -42,6 +56,10 @@ interface GameState {
   errors: number
   startTime: number | null
   romajiState: RomajiInputState | null
+}
+
+function displayChar(kana: string | undefined): string {
+  return kana === ' ' ? '␣' : (kana ?? '')
 }
 
 function pickJaText(): JapaneseSampleText {
@@ -80,20 +98,21 @@ function createGameState(mode: GameMode, retryText?: { targetText: string; displ
   }
 }
 
-function createNewGameState(mode: GameMode): GameState {
-  if (mode === 'ja') {
-    const sample = pickJaText()
-    return {
-      status: 'idle',
-      mode,
-      targetText: sample.kana,
-      displayText: sample.display,
-      currentIndex: 0,
-      errors: 0,
-      startTime: null,
-      romajiState: createInitialState(sample.kana),
-    }
+function createJaGameState(sample: JapaneseSampleText): GameState {
+  return {
+    status: 'idle',
+    mode: 'ja',
+    targetText: sample.kana,
+    displayText: sample.display,
+    currentIndex: 0,
+    errors: 0,
+    startTime: null,
+    romajiState: createInitialState(sample.kana),
   }
+}
+
+function createNewGameState(mode: GameMode): GameState {
+  if (mode === 'ja') return createJaGameState(pickJaText())
   return {
     status: 'idle',
     mode,
@@ -106,7 +125,7 @@ function createNewGameState(mode: GameMode): GameState {
   }
 }
 
-export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, mode, romajiPreferences }: Props) {
+export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, onRightInput, onWrongInput, onPreviewNotesChange, mode, romajiPreferences, synth }: Props) {
   const [game, setGame] = useState<GameState>(() => createNewGameState(mode))
   const [elapsedMs, setElapsedMs] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
@@ -114,11 +133,50 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   const reverseKeymap = useMemo(() => buildReverseKeymap(keymap), [keymap])
 
+  const [playingPlan, setPlayingPlan] = useState<PreviewPlan | null>(null)
+  const stopPreviewRef = useRef<(() => void) | null>(null)
+  const [playingStroke, setPlayingStroke] = useState<number | null>(null)
+  const [previewSpeed, setPreviewSpeed] = useState(loadPreviewSpeed)
+
+  const stopPreview = useCallback(() => {
+    stopPreviewRef.current?.()
+    stopPreviewRef.current = null
+    setPlayingPlan(null)
+  }, [])
+
+  const preview = useMemo(() => {
+    const chunks = game.mode === 'ja'
+      ? createInitialState(game.targetText).chunks
+      : textToCharChunks(game.targetText)
+    return { chunks, plan: planPreview(keymap, chunks, romajiPreferences) }
+  }, [keymap, game.mode, game.targetText, romajiPreferences])
+
+  // playingPlan は plan の同一性で比べるので、plan が変わったときは setState せずタイマーだけ止める。
+  useEffect(() => () => {
+    stopPreviewRef.current?.()
+    stopPreviewRef.current = null
+  }, [preview])
+
+  const previewing = playingPlan === preview.plan
+  const previewStroke: PreviewStroke | undefined =
+    previewing && preview.plan.ok && playingStroke !== null ? preview.plan.strokes[playingStroke] : undefined
+
+  useEffect(() => {
+    onPreviewNotesChange?.(previewStroke?.noteNumbers)
+    return () => onPreviewNotesChange?.(undefined)
+  }, [previewStroke, onPreviewNotesChange])
+
   // Highlight notes for the next expected key
   useEffect(() => {
     if (game.status === 'finished') {
       onHighlightChange(undefined)
       onChordHighlightChange?.(undefined)
+      return
+    }
+
+    if (previewStroke) {
+      onHighlightChange(undefined)
+      onChordHighlightChange?.(previewStroke.noteNumbers.length >= 2 ? [previewStrokeToChordHighlight(previewStroke)] : undefined)
       return
     }
 
@@ -144,7 +202,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
       onHighlightChange(allNotes.length > 0 ? allNotes : undefined)
       onChordHighlightChange?.(matchedMacros.length > 0 ? matchedMacros.map(macroHintToChordHighlight) : undefined)
     }
-  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, onChordHighlightChange, romajiPreferences])
+  }, [game.currentIndex, game.targetText, game.status, game.mode, game.romajiState, reverseKeymap, onHighlightChange, onChordHighlightChange, romajiPreferences, previewStroke])
 
   // Elapsed time timer
   useEffect(() => {
@@ -175,6 +233,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     if (key.length !== 1) return
 
     e.preventDefault()
+    stopPreview()
 
     if (game.mode === 'en') {
       // English mode: existing logic
@@ -256,7 +315,7 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
         }
       })
     }
-  }, [game.status, game.mode, triggerShake, onRightInput, onWrongInput])
+  }, [game.status, game.mode, triggerShake, onRightInput, onWrongInput, stopPreview])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -278,6 +337,50 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     setElapsedMs(0)
   }
 
+  const startPlayback = (plan: PreviewPlan & { ok: true }, startIndex: number, speed: number) => {
+    stopPreviewRef.current?.()
+    setPlayingPlan(plan)
+    stopPreviewRef.current = playPreview(synth, plan.strokes, () => {
+      stopPreviewRef.current = null
+      setPlayingPlan(null)
+    }, {
+      intervalMs: STROKE_INTERVAL_MS / speed,
+      startIndex,
+      onStroke: setPlayingStroke,
+    })
+    setPlayingStroke(startIndex)
+  }
+
+  const handleTogglePreview = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.blur()
+    if (previewing) {
+      stopPreview()
+      return
+    }
+    if (!preview.plan.ok) return
+    startPlayback(preview.plan, 0, previewSpeed)
+  }
+
+  const handleChangeSpeed = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const speed = Number(e.target.value)
+    e.currentTarget.blur()
+    setPreviewSpeed(speed)
+    savePreviewSpeed(speed)
+    if (previewing && preview.plan.ok) startPlayback(preview.plan, playingStroke ?? 0, speed)
+  }
+
+  const handleSelectPoem = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sample = sampleTextsJa[Number(e.target.value)]
+    e.currentTarget.blur()
+    if (!sample) return
+    setGame(createJaGameState(sample))
+    setElapsedMs(0)
+  }
+
+  const selectedPoemIndex = game.mode === 'ja'
+    ? sampleTextsJa.findIndex(t => t.kana === game.targetText)
+    : -1
+
   const elapsedSec = elapsedMs / 1000
   // For romaji mode, count typed romaji characters for WPM
   const typedChars = game.mode === 'ja' && game.romajiState
@@ -290,6 +393,46 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   return (
     <div ref={containerRef} tabIndex={-1} className="outline-none space-y-6">
+      <div className="flex items-center gap-3">
+        {game.mode === 'ja' && (
+          <select
+            value={selectedPoemIndex}
+            onChange={handleSelectPoem}
+            className="min-w-0 flex-1 bg-gray-800 text-gray-200 text-sm rounded px-3 py-2 border border-gray-700"
+          >
+            {sampleTextsJa.map((t, i) => (
+              <option key={i} value={i}>{`${i + 1}. ${t.display}`}</option>
+            ))}
+          </select>
+        )}
+        <button
+          onClick={handleTogglePreview}
+          disabled={!previewing && !preview.plan.ok}
+          className="shrink-0 px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-white text-sm disabled:opacity-40 disabled:hover:bg-gray-700"
+        >
+          {previewing ? '■ 停止' : '▶ 音をプレビュー'}
+        </button>
+        <select
+          value={previewSpeed}
+          onChange={handleChangeSpeed}
+          aria-label="プレビューの再生速度"
+          className="shrink-0 bg-gray-800 text-gray-200 text-sm rounded px-2 py-2 border border-gray-700"
+        >
+          {PREVIEW_SPEEDS.map(speed => (
+            <option key={speed} value={speed}>{`${speed}×`}</option>
+          ))}
+        </select>
+      </div>
+      {previewStroke && (
+        <p className="text-sm text-yellow-300">
+          {`♪ ${previewStroke.text} (${previewStroke.noteNumbers.map(noteNumberToName).join('+')})`}
+        </p>
+      )}
+      {!preview.plan.ok && (
+        <p className="text-sm text-red-400">
+          このレイヤーでは「{displayChar(preview.chunks[preview.plan.chunkIndex]?.kana)}」を入力できない
+        </p>
+      )}
       {/* お題テキスト */}
       <div
         key={shakeKey}
@@ -300,7 +443,9 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
           <div className="text-2xl leading-relaxed tracking-wide">
             {game.targetText.split('').map((char, i) => {
               let className = 'text-gray-500'
-              if (i < game.currentIndex) {
+              if (previewStroke && i >= previewStroke.chunkStart && i <= previewStroke.chunkEnd) {
+                className = PREVIEW_HIGHLIGHT_CLASS
+              } else if (i < game.currentIndex) {
                 className = 'text-green-400'
               } else if (i === game.currentIndex) {
                 className = shakeKey > 0
@@ -327,7 +472,9 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
             <div className="text-2xl leading-relaxed tracking-wide">
               {game.romajiState.chunks.map((chunk, i) => {
                 let className = 'text-gray-500'
-                if (i < game.romajiState!.currentChunkIndex) {
+                if (previewStroke && i >= previewStroke.chunkStart && i <= previewStroke.chunkEnd) {
+                  className = PREVIEW_HIGHLIGHT_CLASS
+                } else if (i < game.romajiState!.currentChunkIndex) {
                   className = 'text-green-400'
                 } else if (i === game.romajiState!.currentChunkIndex) {
                   className = shakeKey > 0
