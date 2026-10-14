@@ -11,7 +11,7 @@ import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
 import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
 import { parseKeymap } from './lib/keymapParser'
-import { PianoSynth } from './lib/pianoSynth'
+import { Synth } from './lib/synth'
 import { loadReleaseSec, saveReleaseSec } from './lib/releaseTimePreference'
 import { loadDeviceSoundEnabled, saveDeviceSoundEnabled } from './lib/deviceSoundPreference'
 import { isMidiPassthroughNote } from './lib/midiPassthrough'
@@ -99,9 +99,9 @@ function App() {
 
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
-  // Web MIDI とシリアルで同じ PianoSynth を共有する (AudioContext は 1 つだけ作る)。
+  // Web MIDI とシリアルで同じ Synth を共有する (AudioContext は 1 つだけ作る)。
   const [synth] = useState(() => {
-    const s = new PianoSynth()
+    const s = new Synth()
     s.setReleaseSec(releaseSec)
     return s
   })

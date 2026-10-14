@@ -13,7 +13,7 @@ import {
   canTypeSequence,
 } from '../lib/romajiMatcher'
 import type { RomajiPreferences } from '../lib/romajiPreferences'
-import type { PianoSynth } from '../lib/pianoSynth'
+import type { Synth } from '../lib/synth'
 import { planPreview, textToCharChunks, type PreviewPlan, type PreviewStroke } from '../lib/previewPlanner'
 import { playPreview, STROKE_INTERVAL_MS } from '../lib/previewPlayer'
 import { PREVIEW_SPEEDS, loadPreviewSpeed, savePreviewSpeed } from '../lib/previewSpeedPreference'
@@ -33,7 +33,7 @@ interface Props {
   onPreviewNotesChange?: (noteNumbers: number[] | undefined) => void
   mode: GameMode
   romajiPreferences: RomajiPreferences
-  synth: PianoSynth
+  synth: Synth
 }
 
 function macroHintToChordHighlight(macro: MacroHint): ChordHighlight {

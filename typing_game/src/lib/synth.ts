@@ -20,7 +20,7 @@ const NATURAL_DECAY_SEC = 6
 const MIN_GAIN = 0.0001
 export const DEFAULT_RELEASE_SEC = 0.6
 
-class Voice {
+class PianoVoice {
   private ctx: AudioContext
   private oscillators: OscillatorNode[] = []
   private gain: GainNode
@@ -79,10 +79,10 @@ class Voice {
   }
 }
 
-export class PianoSynth {
+export class Synth {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
-  private voices = new Map<number, Voice>()
+  private voices = new Map<number, PianoVoice>()
   private releaseSec = DEFAULT_RELEASE_SEC
 
   setReleaseSec(sec: number) {
@@ -105,7 +105,7 @@ export class PianoSynth {
   noteOn(note: number, velocity: number) {
     const { ctx, master } = this.ensureContext()
     this.voices.get(note)?.release(this.releaseSec)
-    const voice = new Voice(ctx, master, note, velocity, () => {
+    const voice = new PianoVoice(ctx, master, note, velocity, () => {
       if (this.voices.get(note) === voice) {
         this.voices.delete(note)
       }
