@@ -95,10 +95,11 @@ function App() {
   const serialRightSetRef = useRef<Set<number>>(new Set())
   const serialWrongSetRef = useRef<Set<number>>(new Set())
 
+  const [releaseSec, setReleaseSec] = useState(loadReleaseSec)
+
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
   // Web MIDI とシリアルで同じ PianoSynth を共有する (AudioContext は 1 つだけ作る)。
-  const [releaseSec, setReleaseSec] = useState(loadReleaseSec)
   const [synth] = useState(() => {
     const s = new PianoSynth()
     s.setReleaseSec(releaseSec)
