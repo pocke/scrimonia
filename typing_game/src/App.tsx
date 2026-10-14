@@ -11,7 +11,8 @@ import { parseDeviceMessage } from './lib/deviceMessages'
 import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/romajiPreferences'
 import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
 import { parseKeymap } from './lib/keymapParser'
-import { Synth } from './lib/synth'
+import { Synth, type Instrument } from './lib/synth'
+import { loadInstrument, saveInstrument } from './lib/instrumentPreference'
 import { loadReleaseSec, saveReleaseSec } from './lib/releaseTimePreference'
 import { loadDeviceSoundEnabled, saveDeviceSoundEnabled } from './lib/deviceSoundPreference'
 import { isMidiPassthroughNote } from './lib/midiPassthrough'
@@ -96,13 +97,15 @@ function App() {
   const serialWrongSetRef = useRef<Set<number>>(new Set())
 
   const [releaseSec, setReleaseSec] = useState(loadReleaseSec)
+  const [instrument, setInstrument] = useState(loadInstrument)
 
-  // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
+  // MIDI 入力をどのモードでも常時購読し、選択した音色で鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
   // Web MIDI とシリアルで同じ Synth を共有する (AudioContext は 1 つだけ作る)。
   const [synth] = useState(() => {
     const s = new Synth()
     s.setReleaseSec(releaseSec)
+    s.setInstrument(instrument)
     return s
   })
   useEffect(() => () => synth.destroy(), [synth])
@@ -236,6 +239,12 @@ function App() {
     savePreferences(prefs)
   }
 
+  const handleInstrumentChange = (next: Instrument) => {
+    setInstrument(next)
+    synth.setInstrument(next)
+    saveInstrument(next)
+  }
+
   const handleReleaseSecChange = (sec: number) => {
     setReleaseSec(sec)
     synth.setReleaseSec(sec)
@@ -317,6 +326,8 @@ function App() {
           onPreferencesChange={handlePreferencesChange}
           deviceSoundEnabled={deviceSoundEnabled}
           onDeviceSoundChange={handleDeviceSoundChange}
+          instrument={instrument}
+          onInstrumentChange={handleInstrumentChange}
           releaseSec={releaseSec}
           onReleaseSecChange={handleReleaseSecChange}
           onKeymapParsed={handleKeymapParsed}
