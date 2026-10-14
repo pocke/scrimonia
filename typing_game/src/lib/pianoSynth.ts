@@ -17,14 +17,15 @@ const PIANO_PARTIALS: Partial[] = [
 
 const ATTACK_SEC = 0.005
 const NATURAL_DECAY_SEC = 6
-const RELEASE_SEC = 0.25
 const MIN_GAIN = 0.0001
+export const DEFAULT_RELEASE_SEC = 0.6
 
 class Voice {
   private ctx: AudioContext
   private oscillators: OscillatorNode[] = []
   private gain: GainNode
   private released = false
+  private naturalEndTime: number
 
   constructor(
     ctx: AudioContext,
@@ -36,6 +37,7 @@ class Voice {
     this.ctx = ctx
     const freq = midiNoteToFrequency(note)
     const now = ctx.currentTime
+    this.naturalEndTime = now + ATTACK_SEC + NATURAL_DECAY_SEC
     const peak = velocity / 127 * 0.5
 
     this.gain = ctx.createGain()
@@ -62,16 +64,17 @@ class Voice {
     }
   }
 
-  release() {
+  release(releaseSec: number) {
     if (this.released) return
     this.released = true
     const now = this.ctx.currentTime
     const current = Math.max(this.gain.gain.value, MIN_GAIN)
     this.gain.gain.cancelScheduledValues(now)
     this.gain.gain.setValueAtTime(current, now)
-    this.gain.gain.exponentialRampToValueAtTime(MIN_GAIN, now + RELEASE_SEC)
+    const endTime = Math.min(now + releaseSec, this.naturalEndTime)
+    this.gain.gain.exponentialRampToValueAtTime(MIN_GAIN, endTime)
     for (const osc of this.oscillators) {
-      osc.stop(now + RELEASE_SEC + 0.05)
+      osc.stop(endTime + 0.05)
     }
   }
 }
@@ -80,6 +83,11 @@ export class PianoSynth {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private voices = new Map<number, Voice>()
+  private releaseSec = DEFAULT_RELEASE_SEC
+
+  setReleaseSec(sec: number) {
+    this.releaseSec = sec
+  }
 
   private ensureContext(): { ctx: AudioContext; master: GainNode } {
     if (!this.ctx || !this.master) {
@@ -96,7 +104,7 @@ export class PianoSynth {
 
   noteOn(note: number, velocity: number) {
     const { ctx, master } = this.ensureContext()
-    this.voices.get(note)?.release()
+    this.voices.get(note)?.release(this.releaseSec)
     const voice = new Voice(ctx, master, note, velocity, () => {
       if (this.voices.get(note) === voice) {
         this.voices.delete(note)
@@ -106,11 +114,11 @@ export class PianoSynth {
   }
 
   noteOff(note: number) {
-    this.voices.get(note)?.release()
+    this.voices.get(note)?.release(this.releaseSec)
   }
 
   releaseAll() {
-    for (const v of this.voices.values()) v.release()
+    for (const v of this.voices.values()) v.release(this.releaseSec)
     this.voices.clear()
   }
 

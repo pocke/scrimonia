@@ -12,6 +12,7 @@ import { type RomajiPreferences, loadPreferences, savePreferences } from './lib/
 import { useMidiInput, type MidiConnectionStatus } from './lib/useMidiInput'
 import { parseKeymap } from './lib/keymapParser'
 import { PianoSynth } from './lib/pianoSynth'
+import { loadReleaseSec, saveReleaseSec } from './lib/releaseTimePreference'
 import { loadDeviceSoundEnabled, saveDeviceSoundEnabled } from './lib/deviceSoundPreference'
 import { isMidiPassthroughNote } from './lib/midiPassthrough'
 
@@ -94,10 +95,16 @@ function App() {
   const serialRightSetRef = useRef<Set<number>>(new Set())
   const serialWrongSetRef = useRef<Set<number>>(new Set())
 
+  const [releaseSec, setReleaseSec] = useState(loadReleaseSec)
+
   // MIDI 入力をどのモードでも常時購読し、ピアノ風の音を鳴らす。
   // activeNotes は Web MIDI 経由で押下中のノート (passthrough 中など)。
   // Web MIDI とシリアルで同じ PianoSynth を共有する (AudioContext は 1 つだけ作る)。
-  const [synth] = useState(() => new PianoSynth())
+  const [synth] = useState(() => {
+    const s = new PianoSynth()
+    s.setReleaseSec(releaseSec)
+    return s
+  })
   useEffect(() => () => synth.destroy(), [synth])
   const { status: midiStatus, activeNotes: midiActiveNotes } = useMidiInput(synth)
 
@@ -229,6 +236,12 @@ function App() {
     savePreferences(prefs)
   }
 
+  const handleReleaseSecChange = (sec: number) => {
+    setReleaseSec(sec)
+    synth.setReleaseSec(sec)
+    saveReleaseSec(sec)
+  }
+
   const handleDeviceSoundChange = (enabled: boolean) => {
     setDeviceSoundEnabled(enabled)
     deviceSoundEnabledRef.current = enabled
@@ -304,6 +317,8 @@ function App() {
           onPreferencesChange={handlePreferencesChange}
           deviceSoundEnabled={deviceSoundEnabled}
           onDeviceSoundChange={handleDeviceSoundChange}
+          releaseSec={releaseSec}
+          onReleaseSecChange={handleReleaseSecChange}
           onKeymapParsed={handleKeymapParsed}
           onClose={() => setShowSettings(false)}
         />
