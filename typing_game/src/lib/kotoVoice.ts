@@ -5,7 +5,7 @@ const PEAK_GAIN = 0.8
 
 const LOWPASS_MIN_HZ = 2500
 const LOWPASS_MAX_HZ = 14000
-const LOWPASS_Q_DB = 0
+const LOWPASS_Q_DB = -3
 
 const BODY_RESONANCES = [
   { frequency: 250, q: 1.2, gain: 3 },

@@ -15,8 +15,9 @@ const CLICK_SEC = 0.004
 const CLICK_GAIN = 0.35
 const NOISE_SEED = 0x6b6f746f
 
-// d → 0 で allpass の係数 C → 1 になり極が z = -1 に近づいて過渡応答が長引くので、d を [0.1, 1.1) に収める
+// 丸め誤差でループゲインが 1 を超えて発散しないための上限
 const MAX_LOOP_GAIN = 0.99999
+// d → 0 で allpass の係数 C → 1 になり極が z = -1 に近づいて過渡応答が長引くので、d を [0.1, 1.1) に収める
 const MIN_FRACTIONAL_DELAY = 0.1
 const AVERAGING_WEIGHT = 0.5
 
