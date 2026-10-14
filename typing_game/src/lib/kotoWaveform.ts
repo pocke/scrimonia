@@ -15,16 +15,16 @@ const CLICK_SEC = 0.004
 const CLICK_GAIN = 0.35
 const NOISE_SEED = 0x6b6f746f
 
-// d を [MIN, MIN + 1) に収めると、allpass の位相遅延が低域で d サンプルに近づき安定する
+// d → 0 で allpass の係数 C → 1 になり極が z = -1 に近づいて過渡応答が長引くので、d を [0.1, 1.1) に収める
+const MAX_LOOP_GAIN = 0.99999
 const MIN_FRACTIONAL_DELAY = 0.1
-// 2 点平均ローパスの群遅延
-const LOWPASS_DELAY = 0.5
+const AVERAGING_WEIGHT = 0.5
 
 function midiFromFrequency(frequency: number): number {
   return 69 + 12 * Math.log2(frequency / 440)
 }
 
-// 低音ほど長く、高音ほど短い。MIDI ノート番号に対して対数的に補間する
+// log(T60) を MIDI ノート番号に対して線形に補間する
 function decayTimeSec(frequency: number): number {
   const t = (midiFromFrequency(frequency) - LOW_NOTE) / (HIGH_NOTE - LOW_NOTE)
   const clamped = Math.min(1, Math.max(0, t))
@@ -45,7 +45,7 @@ function createRandom(seed: number): () => number {
   }
 }
 
-function createExcitation(length: number, random: () => number): Float32Array {
+function createExcitation(length: number, random: () => number): Float32Array<ArrayBuffer> {
   const smoothed = new Float32Array(length)
   let prev = 0
   for (let i = 0; i < length; i++) {
@@ -55,7 +55,7 @@ function createExcitation(length: number, random: () => number): Float32Array {
 
   // 弦の端から β の位置を弾くと、基本周波数の 1/β 倍の整数倍の倍音が消える。
   // 遅延線を一周する巡回くし形フィルタ x[n] - x[n - βN] で表す。
-  // https://ccrma.stanford.edu/~jos/pasp/Plucked_String_Interpolation_Examples.html
+  // https://ccrma.stanford.edu/~jos/pasp/Extended_Karplus_Strong_Algorithm.html
   const combLag = Math.max(1, Math.round(PLUCK_POSITION * length))
   const combed = new Float32Array(length)
   let mean = 0
@@ -68,31 +68,44 @@ function createExcitation(length: number, random: () => number): Float32Array {
   return combed
 }
 
-export function renderKotoWaveform(frequency: number, sampleRate: number): Float32Array {
+export function renderKotoWaveform(frequency: number, sampleRate: number): Float32Array<ArrayBuffer> {
   const t60 = decayTimeSec(frequency)
   const totalSamples = Math.floor(Math.min(t60 + TAIL_SEC, MAX_DURATION_SEC) * sampleRate)
 
+  // 1 周あたりのゲイン g は g^(t60 * frequency) = 10^-3 を満たす
+  const targetLoopGain = Math.pow(10, -3 / (t60 * frequency))
+
+  // ローパス y[n] = (1 - S) x[n] + S x[n-1] の基本波での振幅は sqrt(1 - 2S(1 - S)(1 - cos ω))。
+  // S = 0.5 (2 点平均) のままだと高音では 1 周の損失が g を下回り、T60 に届かない。
+  // そのとき S を下げて損失を g に合わせる。S は低域での遅延サンプル数にもなる。
+  // https://ccrma.stanford.edu/~jos/pasp/Extended_Karplus_Strong_Algorithm.html
+  const omega = 2 * Math.PI * frequency / sampleRate
+  const requiredLoss = (1 - targetLoopGain ** 2) / (1 - Math.cos(omega))
+  const lowpassDelay = requiredLoss >= 0.5
+    ? AVERAGING_WEIGHT
+    : (1 - Math.sqrt(1 - 2 * requiredLoss)) / 2
+  const fundamentalLoss = Math.sqrt(1 - 2 * lowpassDelay * (1 - lowpassDelay) * (1 - Math.cos(omega)))
+  const loopGain = Math.min(MAX_LOOP_GAIN, targetLoopGain / fundamentalLoss)
+
   const period = sampleRate / frequency
-  const lineLength = Math.floor(period - LOWPASS_DELAY - MIN_FRACTIONAL_DELAY)
-  const fractionalDelay = period - LOWPASS_DELAY - lineLength
+  const lineLength = Math.floor(period - lowpassDelay - MIN_FRACTIONAL_DELAY)
+  const fractionalDelay = period - lowpassDelay - lineLength
   // 1 次 allpass H(z) = (C + z^-1) / (1 + C z^-1) の低域遅延が d サンプルになる係数
   // https://ccrma.stanford.edu/~jos/pasp/First_Order_Allpass_Interpolation.html
   const allpassCoef = (1 - fractionalDelay) / (1 + fractionalDelay)
-  // 1 周で 60dB 減衰する時間が t60 になるループゲイン
-  const loopGain = Math.pow(10, -3 / (t60 * frequency))
 
   const random = createRandom(NOISE_SEED)
   const line = createExcitation(lineLength, random)
 
   const out = new Float32Array(totalSamples)
   let index = 0
-  let lowpassPrev = line[lineLength - 1]
+  let lowpassPrev = 0
   let allpassIn = 0
   let allpassOut = 0
   for (let n = 0; n < totalSamples; n++) {
     const delayed = line[index]
     out[n] = delayed
-    const lowpassed = loopGain * 0.5 * (delayed + lowpassPrev)
+    const lowpassed = loopGain * ((1 - lowpassDelay) * delayed + lowpassDelay * lowpassPrev)
     lowpassPrev = delayed
     const filtered = allpassCoef * lowpassed + allpassIn - allpassCoef * allpassOut
     allpassIn = lowpassed
@@ -103,11 +116,11 @@ export function renderKotoWaveform(frequency: number, sampleRate: number): Float
 
   let peak = 0
   for (let i = 0; i < totalSamples; i++) peak = Math.max(peak, Math.abs(out[i]))
-  const clickSamples = Math.min(totalSamples, Math.floor(CLICK_SEC * sampleRate))
   const scale = peak > 0 ? 1 / peak : 1
   for (let i = 0; i < totalSamples; i++) out[i] *= scale
 
   // 爪が弦に当たる瞬間の高域ノイズ
+  const clickSamples = Math.min(totalSamples, Math.floor(CLICK_SEC * sampleRate))
   let prevNoise = 0
   for (let i = 0; i < clickSamples; i++) {
     const noise = random()

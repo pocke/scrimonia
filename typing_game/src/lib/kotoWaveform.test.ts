@@ -37,12 +37,12 @@ function estimateFrequency(samples: Float32Array, expected: number): number {
 }
 
 describe('renderKotoWaveform', () => {
-  it.each([48, 69, 84])('MIDI %i の音高が指定周波数の ±10 cent 以内に収まる', note => {
+  it.each([48, 69, 84, 96])('MIDI %i の音高が指定周波数の ±2 cent 以内に収まる', note => {
     const expected = midiToHz(note)
     const wave = renderKotoWaveform(expected, SAMPLE_RATE)
     const actual = estimateFrequency(wave, expected)
     const cents = 1200 * Math.log2(actual / expected)
-    expect(Math.abs(cents)).toBeLessThanOrEqual(10)
+    expect(Math.abs(cents)).toBeLessThanOrEqual(2)
   })
 
   it('NaN と Infinity を含まず、絶対値の最大が 1 以下になる', () => {
@@ -68,6 +68,26 @@ describe('renderKotoWaveform', () => {
     const low = renderKotoWaveform(midiToHz(48), SAMPLE_RATE)
     const high = renderKotoWaveform(midiToHz(96), SAMPLE_RATE)
     expect(low.length).toBeGreaterThan(high.length)
+  })
+
+  it.each([[84, 1.62], [96, 1.2]])('MIDI %i の実効 T60 が設計値 %f 秒の ±30% に収まる', (note, designed) => {
+    const wave = renderKotoWaveform(midiToHz(note), SAMPLE_RATE)
+    const window = Math.floor(SAMPLE_RATE * 0.05)
+    const early = Math.floor(SAMPLE_RATE * 0.1)
+    const late = Math.floor(SAMPLE_RATE * 0.3)
+    const dropDb = 20 * Math.log10(rms(wave, early, early + window) / rms(wave, late, late + window))
+    const effectiveT60 = 60 * 0.2 / dropDb
+    expect(effectiveT60).toBeGreaterThan(designed * 0.7)
+    expect(effectiveT60).toBeLessThan(designed * 1.3)
+  })
+
+  it.each([96, 108])('MIDI %i の後半に直流成分が残らない', note => {
+    const wave = renderKotoWaveform(midiToHz(note), SAMPLE_RATE)
+    const from = Math.floor(SAMPLE_RATE * 0.3)
+    const to = Math.floor(SAMPLE_RATE * 0.5)
+    let sum = 0
+    for (let i = from; i < to; i++) sum += wave[i]
+    expect(Math.abs(sum / (to - from))).toBeLessThan(1e-4)
   })
 
   it('同じ入力なら同じ波形を返す', () => {

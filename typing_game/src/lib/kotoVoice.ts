@@ -5,7 +5,7 @@ const PEAK_GAIN = 0.8
 
 const LOWPASS_MIN_HZ = 2500
 const LOWPASS_MAX_HZ = 14000
-const LOWPASS_Q = 0.5
+const LOWPASS_Q_DB = 0
 
 const BODY_RESONANCES = [
   { frequency: 250, q: 1.2, gain: 3 },
@@ -31,7 +31,7 @@ function getBuffer(ctx: AudioContext, note: number): AudioBuffer {
   if (!buffer) {
     const samples = renderKotoWaveform(midiNoteToFrequency(note), ctx.sampleRate)
     buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate)
-    buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0)
+    buffer.copyToChannel(samples, 0)
     bufferCache.set(note, buffer)
   }
   return buffer
@@ -66,7 +66,7 @@ export class KotoVoice {
 
     const lowpass = ctx.createBiquadFilter()
     lowpass.type = 'lowpass'
-    lowpass.Q.value = LOWPASS_Q
+    lowpass.Q.value = LOWPASS_Q_DB
     lowpass.frequency.value = LOWPASS_MIN_HZ * Math.pow(LOWPASS_MAX_HZ / LOWPASS_MIN_HZ, strength)
     this.filters.push(lowpass)
 
