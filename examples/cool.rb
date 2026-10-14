@@ -40,7 +40,13 @@ mp.add_layer :default, {
   F5   => KC_D,
   G5   => KC_Z,
   A5   => KC_B,
-  B5   => KC_P,
+
+  # 濁音・半濁音: 清音の子音から半音ずらした黒鍵
+  Cs4  => KC_G,   # g (k の半音下)
+  Ds4  => KC_D,   # d (t の半音下)
+  Fs4  => KC_Z,   # z (s の半音上)
+  Gs4  => KC_B,   # b (h の半音下)
+  As4  => KC_P,   # p (h の半音上)
 
   # モーラ和音: 子音+母音を同時押し → 「子音→母音」の順で出力（弱打=頻出子音のみ）
   [C4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("na"),
@@ -103,11 +109,33 @@ mp.add_layer :default, {
   [A5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("bu"),
   [A5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("be"),
   [A5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("bo"),
-  [B5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("pa"),
-  [B5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("pi"),
-  [B5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("pu"),
-  [B5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("pe"),
-  [B5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("po"),
+
+  # 黒鍵の濁音・半濁音 + 母音 (velocity 判定なし)
+  [Cs4, C3] => Scrimonia::Action::Macro.new("ga"),
+  [Cs4, D3] => Scrimonia::Action::Macro.new("gi"),
+  [Cs4, E3] => Scrimonia::Action::Macro.new("gu"),
+  [Cs4, G3] => Scrimonia::Action::Macro.new("ge"),
+  [Cs4, A3] => Scrimonia::Action::Macro.new("go"),
+  [Ds4, C3] => Scrimonia::Action::Macro.new("da"),
+  [Ds4, D3] => Scrimonia::Action::Macro.new("di"),
+  [Ds4, E3] => Scrimonia::Action::Macro.new("du"),
+  [Ds4, G3] => Scrimonia::Action::Macro.new("de"),
+  [Ds4, A3] => Scrimonia::Action::Macro.new("do"),
+  [Fs4, C3] => Scrimonia::Action::Macro.new("za"),
+  [Fs4, D3] => Scrimonia::Action::Macro.new("zi"),
+  [Fs4, E3] => Scrimonia::Action::Macro.new("zu"),
+  [Fs4, G3] => Scrimonia::Action::Macro.new("ze"),
+  [Fs4, A3] => Scrimonia::Action::Macro.new("zo"),
+  [Gs4, C3] => Scrimonia::Action::Macro.new("ba"),
+  [Gs4, D3] => Scrimonia::Action::Macro.new("bi"),
+  [Gs4, E3] => Scrimonia::Action::Macro.new("bu"),
+  [Gs4, G3] => Scrimonia::Action::Macro.new("be"),
+  [Gs4, A3] => Scrimonia::Action::Macro.new("bo"),
+  [As4, C3] => Scrimonia::Action::Macro.new("pa"),
+  [As4, D3] => Scrimonia::Action::Macro.new("pi"),
+  [As4, E3] => Scrimonia::Action::Macro.new("pu"),
+  [As4, G3] => Scrimonia::Action::Macro.new("pe"),
+  [As4, A3] => Scrimonia::Action::Macro.new("po"),
 
   # 修飾キー (押している間だけ効く)
   Cs3  => KC_LCTL,   # Ctrl
@@ -119,13 +147,10 @@ mp.add_layer :default, {
   Gs3  => layer_num,   # 押すたび :num をトグル
   As3  => KC_SPC,   # ␣
   B3   => KC_ENTER,   # ⏎
-  Cs4  => KC_BSPC,   # ⌫
-  Ds4  => KC_TAB,   # ⇥
-  Fs4  => KC_ESC,   # Esc
-  Gs4  => KC_DEL,   # Del
+  B5   => KC_TAB,   # ⇥
+  C6   => KC_BSPC,   # ⌫
 
   # カーソル
-  As4  => KC_LEFT,   # ←
   Cs5  => KC_DOWN,   # ↓
   Ds5  => KC_UP,   # ↑
   Fs5  => KC_RIGHT,   # →
