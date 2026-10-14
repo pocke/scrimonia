@@ -74,9 +74,10 @@ export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEna
             />
             <span className="text-gray-200">デバイスで押した鍵盤の音を鳴らす</span>
           </label>
-          <label className="flex items-center gap-3 text-sm">
-            <span className="text-gray-200 shrink-0">音の余韻</span>
+          <div className="flex items-center gap-3 text-sm">
+            <label htmlFor="release-sec" className="text-gray-200 shrink-0">音の余韻</label>
             <input
+              id="release-sec"
               type="range"
               min={MIN_RELEASE_SEC}
               max={MAX_RELEASE_SEC}
@@ -86,7 +87,7 @@ export function SettingsModal({ preferences, onPreferencesChange, deviceSoundEna
               className="accent-blue-500 flex-1"
             />
             <span className="text-gray-300 w-16 text-right tabular-nums">{releaseSec.toFixed(2)} 秒</span>
-          </label>
+          </div>
         </div>
 
         {/* Keymap uploader */}
