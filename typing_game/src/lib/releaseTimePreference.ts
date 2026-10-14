@@ -1,8 +1,11 @@
+import { DEFAULT_RELEASE_SEC } from './pianoSynth'
+
+export { DEFAULT_RELEASE_SEC }
+
 const STORAGE_KEY = 'scrimonia-release-sec'
 
 export const MIN_RELEASE_SEC = 0.1
 export const MAX_RELEASE_SEC = 3
-export const DEFAULT_RELEASE_SEC = 0.8
 
 export function loadReleaseSec(): number {
   try {

@@ -1,5 +1,3 @@
-import { DEFAULT_RELEASE_SEC } from './releaseTimePreference'
-
 function midiNoteToFrequency(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12)
 }
@@ -20,6 +18,7 @@ const PIANO_PARTIALS: Partial[] = [
 const ATTACK_SEC = 0.005
 const NATURAL_DECAY_SEC = 6
 const MIN_GAIN = 0.0001
+export const DEFAULT_RELEASE_SEC = 0.8
 
 class Voice {
   private ctx: AudioContext
