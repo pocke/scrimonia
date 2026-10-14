@@ -24,9 +24,15 @@ set(PICO_TINYUSB_PATH ${PICORUBY_ROOT}/mrbgems/picoruby-r2p2/lib/pico-sdk/lib/ti
 # PICORB_VM_MRUBYC: picoruby.h が mruby/c VM 用のヘッダ・API を選択するために必要。
 #                    未定義だと mruby VM 側が選ばれてしまう。
 # PIO_USB_USE_TINYUSB: Pico-PIO-USB を TinyUSB 経由で使う (独自 API ではなく TinyUSB の Host API を利用)。
+# PICO_RUNTIME_NO_INIT_PER_CORE_INSTALL_STACK_GUARD=0: スタックガードの関数だけをリンクする。
+#   PICO_USE_STACK_GUARDS=1 だと起動時に既定のスタック (SCRATCH_Y) へガードを張り、
+#   src/main.c で Core0 のスタックを移した後に張り直せない (MPU が有効だと breakpoint で止まる)。
+# PICO_CORE1_STACK_SIZE=0: Core1 のスタックは src/main.c で渡すので、SDK 既定の領域を確保しない。
 add_compile_definitions(
   PICORB_VM_MRUBYC=1
   PIO_USB_USE_TINYUSB=1
+  PICO_RUNTIME_NO_INIT_PER_CORE_INSTALL_STACK_GUARD=0
+  PICO_CORE1_STACK_SIZE=0
 )
 
 project(scrimonia C CXX ASM)
