@@ -15,7 +15,8 @@ import {
 import type { RomajiPreferences } from '../lib/romajiPreferences'
 import type { PianoSynth } from '../lib/pianoSynth'
 import { planPreview, textToCharChunks, type PreviewPlan } from '../lib/previewPlanner'
-import { playPreview } from '../lib/previewPlayer'
+import { playPreview, STROKE_INTERVAL_MS } from '../lib/previewPlayer'
+import { PREVIEW_SPEEDS, loadPreviewSpeed, savePreviewSpeed } from '../lib/previewSpeedPreference'
 
 export type GameMode = 'en' | 'ja'
 
@@ -125,6 +126,8 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
 
   const [playingPlan, setPlayingPlan] = useState<PreviewPlan | null>(null)
   const stopPreviewRef = useRef<(() => void) | null>(null)
+  const playingStrokeRef = useRef(0)
+  const [previewSpeed, setPreviewSpeed] = useState(loadPreviewSpeed)
 
   const stopPreview = useCallback(() => {
     stopPreviewRef.current?.()
@@ -312,6 +315,21 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
     setElapsedMs(0)
   }
 
+  const startPlayback = (plan: PreviewPlan & { ok: true }, startIndex: number, speed: number) => {
+    stopPreviewRef.current?.()
+    setPlayingPlan(plan)
+    stopPreviewRef.current = playPreview(synth, plan.strokes, () => {
+      stopPreviewRef.current = null
+      setPlayingPlan(null)
+    }, {
+      intervalMs: STROKE_INTERVAL_MS / speed,
+      startIndex,
+      onStroke: index => {
+        playingStrokeRef.current = index
+      },
+    })
+  }
+
   const handleTogglePreview = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.blur()
     if (previewing) {
@@ -319,11 +337,16 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
       return
     }
     if (!preview.plan.ok) return
-    setPlayingPlan(preview.plan)
-    stopPreviewRef.current = playPreview(synth, preview.plan.strokes, () => {
-      stopPreviewRef.current = null
-      setPlayingPlan(null)
-    })
+    playingStrokeRef.current = 0
+    startPlayback(preview.plan, 0, previewSpeed)
+  }
+
+  const handleChangeSpeed = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const speed = Number(e.target.value)
+    e.currentTarget.blur()
+    setPreviewSpeed(speed)
+    savePreviewSpeed(speed)
+    if (previewing && preview.plan.ok) startPlayback(preview.plan, playingStrokeRef.current, speed)
   }
 
   const handleSelectPoem = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -369,6 +392,16 @@ export function TypingGame({ keymap, onHighlightChange, onChordHighlightChange, 
         >
           {previewing ? '■ 停止' : '▶ 音をプレビュー'}
         </button>
+        <select
+          value={previewSpeed}
+          onChange={handleChangeSpeed}
+          aria-label="プレビューの再生速度"
+          className="shrink-0 bg-gray-800 text-gray-200 text-sm rounded px-2 py-2 border border-gray-700"
+        >
+          {PREVIEW_SPEEDS.map(speed => (
+            <option key={speed} value={speed}>{`${speed}×`}</option>
+          ))}
+        </select>
       </div>
       {!preview.plan.ok && (
         <p className="text-sm text-red-400">
