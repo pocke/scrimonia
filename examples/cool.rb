@@ -2,13 +2,48 @@ require 'scrimonia'
 include Scrimonia::Notes # steep:ignore NoMethod
 include Scrimonia::Keycodes # steep:ignore NoMethod
 
+# モーラ和音: 子音+母音を同時押し → 「子音→母音」の順で出力
+def add_mora_chords(layer, soft)
+  vowel_notes = { "a" => C3, "i" => D3, "u" => E3, "e" => G3, "o" => A3 }
+  all_vowels = %w[a i u e o]
+  mora_chords = [
+    # 白鍵は弱打のときだけ和音になる
+    [C4.with(velocity: soft), "n", all_vowels],
+    [D4.with(velocity: soft), "k", all_vowels],
+    [E4.with(velocity: soft), "t", all_vowels],
+    [F4.with(velocity: soft), "s", all_vowels],
+    [G4.with(velocity: soft), "r", all_vowels],
+    [A4.with(velocity: soft), "h", all_vowels],
+    [B4.with(velocity: soft), "m", all_vowels],
+    [C5.with(velocity: soft), "y", %w[a u o]],
+    [D5.with(velocity: soft), "w", %w[a o]],
+    [E5.with(velocity: soft), "g", all_vowels],
+    [F5.with(velocity: soft), "d", all_vowels],
+    [G5.with(velocity: soft), "z", all_vowels],
+    [A5.with(velocity: soft), "b", all_vowels],
+    # 黒鍵の濁音・半濁音 (velocity 判定なし)
+    [Cs4, "g", all_vowels],
+    [Ds4, "d", all_vowels],
+    [Fs4, "z", all_vowels],
+    [Gs4, "b", all_vowels],
+    [As4, "p", all_vowels],
+  ] #: Array[[Scrimonia::Note, String, Array[String]]]
+
+  mora_chords.each do |consonant_note, consonant, vowels|
+    vowels.each do |vowel|
+      layer[[consonant_note, vowel_notes[vowel] || raise("unknown vowel: #{vowel}")]] = Scrimonia::Action::Macro.new(consonant + vowel)
+    end
+  end
+  layer
+end
+
 # 彩りダイアトニック（採用） / 37鍵 — 文字 + モーラ和音Macro + 修飾 + 空白/編集 + :num(トグル)
 mp = Scrimonia.new
 soft = 1..70
 hard = 71..127
 layer_num = Scrimonia::Action::LayerChange.new(:num, :switch)
 
-mp.add_layer :default, {
+mp.add_layer :default, add_mora_chords({
   # 母音 (velocity判定なし・低音5音)
   C3   => KC_A,
   D3   => KC_I,
@@ -48,95 +83,6 @@ mp.add_layer :default, {
   Gs4  => KC_B,   # b (h の半音下)
   As4  => KC_P,   # p (h の半音上)
 
-  # モーラ和音: 子音+母音を同時押し → 「子音→母音」の順で出力（弱打=頻出子音のみ）
-  [C4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("na"),
-  [C4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("ni"),
-  [C4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("nu"),
-  [C4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("ne"),
-  [C4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("no"),
-  [D4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ka"),
-  [D4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("ki"),
-  [D4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("ku"),
-  [D4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("ke"),
-  [D4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("ko"),
-  [E4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ta"),
-  [E4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("ti"),
-  [E4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("tu"),
-  [E4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("te"),
-  [E4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("to"),
-  [F4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("sa"),
-  [F4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("si"),
-  [F4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("su"),
-  [F4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("se"),
-  [F4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("so"),
-  [G4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ra"),
-  [G4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("ri"),
-  [G4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("ru"),
-  [G4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("re"),
-  [G4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("ro"),
-  [A4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ha"),
-  [A4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("hi"),
-  [A4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("hu"),
-  [A4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("he"),
-  [A4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("ho"),
-  [B4.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ma"),
-  [B4.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("mi"),
-  [B4.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("mu"),
-  [B4.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("me"),
-  [B4.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("mo"),
-  [C5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ya"),
-  [C5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("yu"),
-  [C5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("yo"),
-  [D5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("wa"),
-  [D5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("wo"),
-  [E5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ga"),
-  [E5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("gi"),
-  [E5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("gu"),
-  [E5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("ge"),
-  [E5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("go"),
-  [F5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("da"),
-  [F5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("di"),
-  [F5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("du"),
-  [F5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("de"),
-  [F5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("do"),
-  [G5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("za"),
-  [G5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("zi"),
-  [G5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("zu"),
-  [G5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("ze"),
-  [G5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("zo"),
-  [A5.with(velocity: soft), C3] => Scrimonia::Action::Macro.new("ba"),
-  [A5.with(velocity: soft), D3] => Scrimonia::Action::Macro.new("bi"),
-  [A5.with(velocity: soft), E3] => Scrimonia::Action::Macro.new("bu"),
-  [A5.with(velocity: soft), G3] => Scrimonia::Action::Macro.new("be"),
-  [A5.with(velocity: soft), A3] => Scrimonia::Action::Macro.new("bo"),
-
-  # 黒鍵の濁音・半濁音 + 母音 (velocity 判定なし)
-  [Cs4, C3] => Scrimonia::Action::Macro.new("ga"),
-  [Cs4, D3] => Scrimonia::Action::Macro.new("gi"),
-  [Cs4, E3] => Scrimonia::Action::Macro.new("gu"),
-  [Cs4, G3] => Scrimonia::Action::Macro.new("ge"),
-  [Cs4, A3] => Scrimonia::Action::Macro.new("go"),
-  [Ds4, C3] => Scrimonia::Action::Macro.new("da"),
-  [Ds4, D3] => Scrimonia::Action::Macro.new("di"),
-  [Ds4, E3] => Scrimonia::Action::Macro.new("du"),
-  [Ds4, G3] => Scrimonia::Action::Macro.new("de"),
-  [Ds4, A3] => Scrimonia::Action::Macro.new("do"),
-  [Fs4, C3] => Scrimonia::Action::Macro.new("za"),
-  [Fs4, D3] => Scrimonia::Action::Macro.new("zi"),
-  [Fs4, E3] => Scrimonia::Action::Macro.new("zu"),
-  [Fs4, G3] => Scrimonia::Action::Macro.new("ze"),
-  [Fs4, A3] => Scrimonia::Action::Macro.new("zo"),
-  [Gs4, C3] => Scrimonia::Action::Macro.new("ba"),
-  [Gs4, D3] => Scrimonia::Action::Macro.new("bi"),
-  [Gs4, E3] => Scrimonia::Action::Macro.new("bu"),
-  [Gs4, G3] => Scrimonia::Action::Macro.new("be"),
-  [Gs4, A3] => Scrimonia::Action::Macro.new("bo"),
-  [As4, C3] => Scrimonia::Action::Macro.new("pa"),
-  [As4, D3] => Scrimonia::Action::Macro.new("pi"),
-  [As4, E3] => Scrimonia::Action::Macro.new("pu"),
-  [As4, G3] => Scrimonia::Action::Macro.new("pe"),
-  [As4, A3] => Scrimonia::Action::Macro.new("po"),
-
   # 修飾キー (押している間だけ効く)
   Cs3  => KC_LCTL,   # Ctrl
   Ds3  => KC_LALT,   # Alt
@@ -154,7 +100,7 @@ mp.add_layer :default, {
   Cs5  => KC_DOWN,   # ↓
   Ds5  => KC_UP,   # ↑
   Fs5  => KC_RIGHT,   # →
-}
+}, soft)
 
 # :num レイヤー — 123キーで default とトグル。不協和は無視。
 mp.add_layer :num, {
